@@ -59,13 +59,33 @@ export function isInPeriodByRowOffset(
   return inRange;
 }
 
-export function toDisplayDateTime(occurredAtISO: string, tzOffsetMinutes: number) {
+export function toDisplayDateTime(
+  occurredAtISO: string,
+  tzOffsetMinutes: number,
+) {
   // Use current device timezone, not stored offset
   const currentOffset = -new Date().getTimezoneOffset();
   const localTs = DateTime.fromISO(occurredAtISO, { zone: "utc" }).plus({
     minutes: currentOffset,
   });
-  return localTs.toLocaleString({ weekday: "short", hour: "numeric", minute: "2-digit" });
+  return localTs.toLocaleString({
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+export function toDisplayTime(occurredAtISO: string, tzOffsetMinutes: number) {
+  // Use current device timezone, not stored offset
+  const currentOffset = -new Date().getTimezoneOffset();
+  const localTs = DateTime.fromISO(occurredAtISO, { zone: "utc" }).plus({
+    minutes: currentOffset,
+  });
+  return localTs.toLocaleString({
+    hour: "numeric",
+    minute: "2-digit",
+    hourCycle: "h12",
+  });
 }
 
 export function tzOffsetNowMinutes() {

@@ -37,10 +37,20 @@ function Home() {
     load();
   }, [period]);
 
-  const visible = useMemo(
-    () => entries.filter((e) => isInPeriodByRowOffset(e.occurred_at, e.tz_offset_minutes, period)),
-    [entries, period],
-  );
+  const visible = useMemo(() => {
+    const filtered = entries.filter((e) =>
+      isInPeriodByRowOffset(e.occurred_at, e.tz_offset_minutes, period),
+    );
+    return filtered.sort((a, b) => {
+      const timeA =
+        new Date(a.occurred_at).getHours() * 60 +
+        new Date(a.occurred_at).getMinutes();
+      const timeB =
+        new Date(b.occurred_at).getHours() * 60 +
+        new Date(b.occurred_at).getMinutes();
+      return timeA - timeB;
+    });
+  }, [entries, period]);
 
   async function handleCreate(input: {
     description: string;
@@ -81,9 +91,17 @@ function Home() {
             {err}
           </div>
         )}
-        <EntryList entries={visible} mealFilter={mealFilter} onChanged={load} />
+        <EntryList
+          entries={visible}
+          mealFilter={mealFilter}
+          period={period}
+          onChanged={load}
+        />
       </main>
-      <button className="fab" onClick={() => document.querySelector("textarea")?.focus()}>
+      <button
+        className="fab"
+        onClick={() => document.querySelector("textarea")?.focus()}
+      >
         + Add
       </button>
     </div>

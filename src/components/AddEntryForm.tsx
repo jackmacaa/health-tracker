@@ -28,6 +28,25 @@ function getMealTypeFromDateTime(dtString: string): MealType {
   return "dinner";
 }
 
+function getDefaultTimeForMealType(
+  mealType: MealType,
+  baseDate?: DateTime,
+): DateTime {
+  const base = baseDate || DateTime.local();
+  const timeMap: Record<MealType, number> = {
+    breakfast: 8,
+    lunch: 12,
+    dinner: 18,
+    snack: 15,
+  };
+  return base.set({
+    hour: timeMap[mealType],
+    minute: 0,
+    second: 0,
+    millisecond: 0,
+  });
+}
+
 export default function AddEntryForm({ onCreate }: Props) {
   const [description, setDescription] = useState("");
   const [meal, setMeal] = useState<MealType | null>(null);
@@ -44,6 +63,16 @@ export default function AddEntryForm({ onCreate }: Props) {
   useEffect(() => {
     setMeal(getMealTypeFromDateTime(dt));
   }, [dt]);
+
+  function handleMealChange(newMeal: MealType | null) {
+    setMeal(newMeal);
+    if (newMeal) {
+      // Set the datetime to the default time for this meal type, keeping the current date
+      const currentDate = DateTime.fromISO(dt);
+      const defaultTime = getDefaultTimeForMealType(newMeal, currentDate);
+      setDt(defaultTime.toFormat("yyyy-MM-dd'T'HH:mm"));
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,7 +94,11 @@ export default function AddEntryForm({ onCreate }: Props) {
     // Store as local ISO string (no UTC conversion) + current timezone offset
     const occurredAtUtc = localDt.toUTC().toISO({ suppressMilliseconds: true });
     const tzOffset = -new Date().getTimezoneOffset(); // minutes ahead of UTC
-    console.log("Submitting:", { local: localDt.toString(), utc: occurredAtUtc, tzOffset });
+    console.log("Submitting:", {
+      local: localDt.toString(),
+      utc: occurredAtUtc,
+      tzOffset,
+    });
     setBusy(true);
     try {
       await onCreate({
@@ -96,11 +129,15 @@ export default function AddEntryForm({ onCreate }: Props) {
       </div>
       <div className="stack">
         <label>Meal type</label>
-        <MealTypeChips value={meal} onChange={setMeal} />
+        <MealTypeChips value={meal} onChange={handleMealChange} />
       </div>
       <div className="stack">
         <label>Date & time</label>
-        <input type="datetime-local" value={dt ?? ""} onChange={(e) => setDt(e.target.value)} />
+        <input
+          type="datetime-local"
+          value={dt ?? ""}
+          onChange={(e) => setDt(e.target.value)}
+        />
       </div>
       {err && (
         <div className="item-sub" style={{ color: "#ffb4b4" }}>
