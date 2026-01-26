@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DateTime } from "luxon";
-import { tzOffsetNowMinutes } from "../lib/date";
 import type { MealType } from "../types";
 import MealTypeChips from "./MealTypeChips";
 
@@ -13,14 +12,38 @@ interface Props {
   }) => Promise<void>;
 }
 
+function getDefaultMealType(): MealType {
+  const hour = DateTime.local().hour;
+  if (hour < 10) return "breakfast";
+  if (hour < 16) return "lunch";
+  return "dinner";
+}
+
+function getMealTypeFromDateTime(dtString: string): MealType {
+  const parsed = DateTime.fromISO(dtString);
+  if (!parsed.isValid) return getDefaultMealType();
+  const hour = parsed.hour;
+  if (hour < 10) return "breakfast";
+  if (hour < 16) return "lunch";
+  return "dinner";
+}
+
 export default function AddEntryForm({ onCreate }: Props) {
   const [description, setDescription] = useState("");
   const [meal, setMeal] = useState<MealType | null>(null);
-  const [dt, setDt] = useState(
-    DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm")
-  );
+  const [dt, setDt] = useState(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Set default meal type on mount
+    setMeal(getDefaultMealType());
+  }, []);
+
+  // Update meal type when datetime changes
+  useEffect(() => {
+    setMeal(getMealTypeFromDateTime(dt));
+  }, [dt]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

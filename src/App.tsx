@@ -68,13 +68,13 @@ function Home() {
         </div>
       </header>
       <main className="container stack">
+        <AddEntryForm onCreate={handleCreate} />
         <Filters
           period={period}
           onPeriodChange={setPeriod}
           mealFilter={mealFilter}
           onMealFilterChange={setMealFilter}
         />
-        <AddEntryForm onCreate={handleCreate} />
         {loading && <div className="card">Loading…</div>}
         {err && (
           <div className="card" style={{ color: "#ffb4b4" }}>

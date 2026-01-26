@@ -1,12 +1,12 @@
 :root {
-  --bg: #0b1020;
-  --card: #121a2f;
-  --text: #e6eeff;
-  --muted: #b0b8c9;
-  --accent: #0ea5e9;
+  --bg: #f8fdf9;
+  --card: #ffffff;
+  --text: #1a3d2e;
+  --muted: #5a7a68;
+  --accent: #16a34a;
   --accent-2: #22c55e;
-  --danger: #ef4444;
-  --border: #24304d;
+  --danger: #dc2626;
+  --border: #d1e7dd;
 }
 * {
   box-sizing: border-box;
@@ -38,7 +38,7 @@ body {
 .header {
   position: sticky;
   top: 0;
-  background: linear-gradient(180deg, var(--bg) 70%, #0b102000);
+  background: linear-gradient(180deg, var(--bg) 70%, #f8fdf900);
   z-index: 10;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
@@ -77,7 +77,7 @@ textarea {
   padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: #0d1526;
+  background: #ffffff;
   color: var(--text);
 }
 textarea {
@@ -93,13 +93,13 @@ textarea {
   padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: #0d1526;
+  background: #ffffff;
   color: var(--muted);
   cursor: pointer;
 }
 .chip.active {
   background: var(--accent);
-  color: #001019;
+  color: #ffffff;
   border-color: transparent;
 }
 .chip.ghost {
@@ -110,11 +110,11 @@ textarea {
   border-radius: 10px;
   border: none;
   cursor: pointer;
-  color: #001019;
+  color: #ffffff;
   background: var(--accent);
 }
 .btn.secondary {
-  background: #1e293b;
+  background: #ffffff;
   color: var(--text);
   border: 1px solid var(--border);
 }
@@ -133,7 +133,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  background: #0d1526;
+  background: #ffffff;
   border: 1px solid var(--border);
   border-radius: 10px;
 }
@@ -160,9 +160,9 @@ textarea {
   padding: 14px 16px;
   border-radius: 999px;
   background: var(--accent-2);
-  color: #00150a;
+  color: #ffffff;
   border: none;
-  box-shadow: 0 8px 24px #0006;
+  box-shadow: 0 8px 24px #0004;
   cursor: pointer;
 }
 .empty {
