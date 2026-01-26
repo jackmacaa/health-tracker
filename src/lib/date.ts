@@ -37,16 +37,28 @@ export function isInPeriodByRowOffset(
   base = nowLocal(),
 ) {
   const { start, end } = periodBounds(kind, base);
+  // Always use current device timezone offset for filtering, not stored offset
+  const currentOffset = -new Date().getTimezoneOffset();
   const localTs = DateTime.fromISO(occurredAtISO, { zone: "utc" }).plus({
-    minutes: tzOffsetMinutes,
+    minutes: currentOffset,
   });
-  return localTs >= start && localTs < end;
+  const inRange = localTs >= start && localTs < end;
+  console.log(`isInPeriodByRowOffset(${kind}):`, {
+    occurredAtISO,
+    currentOffset,
+    localTs: localTs.toString(),
+    start: start.toString(),
+    end: end.toString(),
+    inRange,
+  });
+  return inRange;
 }
 
 export function toDisplayDateTime(occurredAtISO: string, tzOffsetMinutes: number) {
-  // Render based on stored local offset
+  // Use current device timezone, not stored offset
+  const currentOffset = -new Date().getTimezoneOffset();
   const localTs = DateTime.fromISO(occurredAtISO, { zone: "utc" }).plus({
-    minutes: tzOffsetMinutes,
+    minutes: currentOffset,
   });
   return localTs.toLocaleString({ weekday: "short", hour: "numeric", minute: "2-digit" });
 }

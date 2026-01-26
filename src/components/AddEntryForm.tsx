@@ -16,7 +16,9 @@ interface Props {
 export default function AddEntryForm({ onCreate }: Props) {
   const [description, setDescription] = useState("");
   const [meal, setMeal] = useState<MealType | null>(null);
-  const [dt, setDt] = useState(DateTime.local().toISO({ suppressMilliseconds: true }));
+  const [dt, setDt] = useState(
+    DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm")
+  );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -37,8 +39,10 @@ export default function AddEntryForm({ onCreate }: Props) {
       setErr("Invalid date/time");
       return;
     }
+    // Store as local ISO string (no UTC conversion) + current timezone offset
     const occurredAtUtc = localDt.toUTC().toISO({ suppressMilliseconds: true });
-    const tzOffset = tzOffsetNowMinutes();
+    const tzOffset = -new Date().getTimezoneOffset(); // minutes ahead of UTC
+    console.log("Submitting:", { local: localDt.toString(), utc: occurredAtUtc, tzOffset });
     setBusy(true);
     try {
       await onCreate({
@@ -48,8 +52,8 @@ export default function AddEntryForm({ onCreate }: Props) {
         tz_offset_minutes: tzOffset,
       });
       setDescription("");
-      setMeal(meal); // keep last selection sticky
-      setDt(DateTime.local().toISO({ suppressMilliseconds: true }));
+      setMeal(meal);
+      setDt(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
     } catch (e: any) {
       setErr(e.message ?? String(e));
     } finally {
@@ -89,7 +93,7 @@ export default function AddEntryForm({ onCreate }: Props) {
           type="button"
           onClick={() => {
             setDescription("");
-            setDt(DateTime.local().toISO({ suppressMilliseconds: true }));
+            setDt(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
           }}
         >
           Reset
