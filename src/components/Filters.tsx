@@ -7,17 +7,27 @@ interface Props {
   onMealFilterChange: (m: MealType | null) => void;
 }
 
-export default function Filters({ period, onPeriodChange, mealFilter, onMealFilterChange }: Props) {
+export default function Filters({
+  period,
+  onPeriodChange,
+  mealFilter,
+  onMealFilterChange,
+}: Props) {
   return (
     <div className="card">
       <details style={{ cursor: "pointer" }}>
-        <summary style={{ fontWeight: 600, padding: "4px 0", userSelect: "none" }}>
+        <summary
+          style={{ fontWeight: 600, padding: "4px 0", userSelect: "none" }}
+        >
           🔍 Filters
         </summary>
         <div className="stack" style={{ marginTop: "12px", gap: "8px" }}>
           <div className="stack">
             <label>Time period</label>
-            <select value={period} onChange={(e) => onPeriodChange(e.target.value as FilterKind)}>
+            <select
+              value={period}
+              onChange={(e) => onPeriodChange(e.target.value as FilterKind)}
+            >
               <option value="today">Today</option>
               <option value="week">This Week</option>
               <option value="month">This Month</option>
@@ -28,7 +38,9 @@ export default function Filters({ period, onPeriodChange, mealFilter, onMealFilt
             <label>Meal type</label>
             <select
               value={mealFilter ?? ""}
-              onChange={(e) => onMealFilterChange((e.target.value as MealType) || null)}
+              onChange={(e) =>
+                onMealFilterChange((e.target.value as MealType) || null)
+              }
             >
               <option value="">All meals</option>
               <option value="breakfast">Breakfast</option>
