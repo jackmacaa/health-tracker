@@ -51,7 +51,7 @@ function AuthedApp({ userId }: { userId: string }) {
     <div>
       <header className="header">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <h1 className="title">🥗 Health Tracker</h1>
+          <h1 className="title">B2S</h1>
           <div className="row" style={{ gap: "8px" }}>
             <NavLink
               className={({ isActive }) => `tab${isActive ? " active" : ""}`}

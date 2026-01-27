@@ -43,18 +43,29 @@ export default function LeaderboardPage({ userId }: Props) {
   const rows = useMemo(() => {
     const byUser: Record<string, { first: DailyMetric; latest: DailyMetric }> =
       {};
+
     metrics.forEach((m) => {
       if (!byUser[m.user_id]) {
         byUser[m.user_id] = { first: m, latest: m };
       } else {
-        if (m.occurred_at < byUser[m.user_id].first.occurred_at) {
+        // Convert to proper DateTime objects for comparison
+        const mTime = new Date(m.occurred_at).getTime();
+        const firstTime = new Date(
+          byUser[m.user_id].first.occurred_at,
+        ).getTime();
+        const latestTime = new Date(
+          byUser[m.user_id].latest.occurred_at,
+        ).getTime();
+
+        if (mTime < firstTime) {
           byUser[m.user_id].first = m;
         }
-        if (m.occurred_at > byUser[m.user_id].latest.occurred_at) {
+        if (mTime > latestTime) {
           byUser[m.user_id].latest = m;
         }
       }
     });
+
     return members
       .map((member) => {
         const userMetrics = byUser[member.user_id];
@@ -64,6 +75,7 @@ export default function LeaderboardPage({ userId }: Props) {
           startWeight && latestWeight
             ? ((startWeight - latestWeight) / startWeight) * 100
             : null;
+
         return {
           member,
           latest: userMetrics?.latest ?? null,
@@ -88,16 +100,17 @@ export default function LeaderboardPage({ userId }: Props) {
       const ch = await getChallenge(DEFAULT_CHALLENGE_ID);
       if (!ch) throw new Error("Challenge not found");
       setChallenge(ch);
+
       const memberRows = await listChallengeMembers(DEFAULT_CHALLENGE_ID);
       setMembers(memberRows);
       const mine = await getMyChallengeMember(DEFAULT_CHALLENGE_ID, userId);
       setDisplayName(mine?.display_name ?? "");
+
+      // Fetch all metrics for challenge members (not restricted by challenge dates)
+      // This allows the leaderboard to show total weight loss, including data from before the challenge
       const metricsRows = await listDailyMetricsInRange({
-        startUtcISO: DateTime.fromISO(ch.start_at).toUTC().toISO()!,
-        endUtcISO: DateTime.fromISO(ch.end_at)
-          .plus({ days: 1 })
-          .toUTC()
-          .toISO()!,
+        startUtcISO: DateTime.local(1970, 1, 1).toUTC().toISO()!,
+        endUtcISO: DateTime.now().plus({ days: 1 }).toUTC().toISO()!,
         challenge_id: DEFAULT_CHALLENGE_ID,
       });
       setMetrics(metricsRows);
@@ -204,7 +217,9 @@ export default function LeaderboardPage({ userId }: Props) {
                 : "—";
               const pct =
                 row.percentLoss != null
-                  ? `${row.percentLoss.toFixed(1)}%`
+                  ? row.percentLoss > 0
+                    ? `${row.percentLoss.toFixed(1)}%`
+                    : "No loss yet!"
                   : "No data";
               return (
                 <div key={row.member.id} className="item">
@@ -213,7 +228,8 @@ export default function LeaderboardPage({ userId }: Props) {
                       #{idx + 1} {name}
                     </div>
                     <div className="item-sub">
-                      Last updated {latest} · {pct}
+                      Last updated {latest} ·{" "}
+                      <span style={{ fontWeight: 600 }}>{pct}</span>
                     </div>
                   </div>
                 </div>

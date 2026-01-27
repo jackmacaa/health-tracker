@@ -332,7 +332,7 @@ export default function WeightTrackerPage({ userId }: Props) {
                   min="0"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
-                  placeholder="89.5"
+                  placeholder="100.0"
                   required
                 />
               </div>
@@ -354,7 +354,7 @@ export default function WeightTrackerPage({ userId }: Props) {
                     min="0"
                     value={calories}
                     onChange={(e) => setCalories(e.target.value)}
-                    placeholder="550"
+                    placeholder="2000"
                   />
                 </div>
               </div>
