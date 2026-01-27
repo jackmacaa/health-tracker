@@ -4,7 +4,11 @@ import AddEntryForm from "./components/AddEntryForm";
 import Filters from "./components/Filters";
 import EntryList from "./components/EntryList";
 import type { Entry, FilterKind, MealType } from "./types";
-import { isInPeriodByRowOffset, widenedUtcFetchBounds } from "./lib/date";
+import {
+  isInPeriodByRowOffset,
+  toLocalDateTime,
+  widenedUtcFetchBounds,
+} from "./lib/date";
 import { createEntry, listEntriesInRange } from "./api/entries";
 import { supabase } from "./lib/supabase";
 
@@ -42,12 +46,10 @@ function Home() {
       isInPeriodByRowOffset(e.occurred_at, e.tz_offset_minutes, period),
     );
     return filtered.sort((a, b) => {
-      const timeA =
-        new Date(a.occurred_at).getHours() * 60 +
-        new Date(a.occurred_at).getMinutes();
-      const timeB =
-        new Date(b.occurred_at).getHours() * 60 +
-        new Date(b.occurred_at).getMinutes();
+      const aLocal = toLocalDateTime(a.occurred_at, a.tz_offset_minutes);
+      const bLocal = toLocalDateTime(b.occurred_at, b.tz_offset_minutes);
+      const timeA = aLocal.hour * 60 + aLocal.minute;
+      const timeB = bLocal.hour * 60 + bLocal.minute;
       return timeA - timeB;
     });
   }, [entries, period]);

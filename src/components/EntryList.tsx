@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Entry, MealType, FilterKind } from "../types";
 import { DateTime } from "luxon";
-import { toDisplayTime } from "../lib/date";
+import { toDisplayTime, toLocalDateTime } from "../lib/date";
 import { deleteEntry, updateEntry } from "../api/entries";
 
 interface Props {
@@ -76,10 +76,10 @@ export default function EntryList({
     const groupedByDate = new Map<string, Map<MealType, Entry[]>>();
 
     filtered.forEach((e) => {
-      const currentOffset = -new Date().getTimezoneOffset();
-      const localDate = DateTime.fromISO(e.occurred_at, { zone: "utc" })
-        .plus({ minutes: currentOffset })
-        .toISODate();
+      const localDate = toLocalDateTime(
+        e.occurred_at,
+        e.tz_offset_minutes,
+      ).toISODate();
 
       if (!groupedByDate.has(localDate!)) {
         groupedByDate.set(localDate!, new Map());

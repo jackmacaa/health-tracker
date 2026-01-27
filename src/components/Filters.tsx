@@ -10,7 +10,7 @@ interface Props {
 export default function Filters({ period, onPeriodChange, mealFilter, onMealFilterChange }: Props) {
   return (
     <div className="card">
-      <details open style={{ cursor: "pointer" }}>
+      <details style={{ cursor: "pointer" }}>
         <summary style={{ fontWeight: 600, padding: "4px 0", userSelect: "none" }}>
           🔍 Filters
         </summary>
