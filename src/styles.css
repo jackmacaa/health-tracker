@@ -105,6 +105,19 @@ textarea {
 .chip.ghost {
   background: transparent;
 }
+.tab {
+  padding: 8px 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--muted);
+  border: 1px solid transparent;
+  font-weight: 600;
+}
+.tab.active {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
 .btn {
   padding: 12px 14px;
   border-radius: 10px;

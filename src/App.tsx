@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  NavLink,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
 import AuthGate from "./components/AuthGate";
 import AddEntryForm from "./components/AddEntryForm";
 import Filters from "./components/Filters";
 import EntryList from "./components/EntryList";
+import WeightTrackerPage from "./pages/WeightTrackerPage";
+import LeaderboardPage from "./pages/LeaderboardPage";
 import type { Entry, FilterKind, MealType } from "./types";
 import {
   isInPeriodByRowOffset,
@@ -13,10 +22,74 @@ import { createEntry, listEntriesInRange } from "./api/entries";
 import { supabase } from "./lib/supabase";
 
 export default function App() {
-  return <AuthGate>{() => <Home />}</AuthGate>;
+  return <AuthGate>{(userId) => <AuthedApp userId={userId} />}</AuthGate>;
 }
 
-function Home() {
+function AuthedApp({ userId }: { userId: string }) {
+  const location = useLocation();
+  async function signOut() {
+    await supabase.auth.signOut();
+    window.location.reload();
+  }
+
+  return (
+    <div>
+      <header className="header">
+        <div className="row" style={{ justifyContent: "space-between" }}>
+          <h1 className="title">🥗 Health Tracker</h1>
+          <div className="row" style={{ gap: "8px" }}>
+            <NavLink
+              className={({ isActive }) => `tab${isActive ? " active" : ""}`}
+              to="/"
+              end
+            >
+              Food
+            </NavLink>
+            <NavLink
+              className={({ isActive }) => `tab${isActive ? " active" : ""}`}
+              to="/weight"
+            >
+              Weight
+            </NavLink>
+            <NavLink
+              className={({ isActive }) => `tab${isActive ? " active" : ""}`}
+              to="/leaderboard"
+            >
+              Leaderboard
+            </NavLink>
+            <button className="chip ghost" onClick={signOut}>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+      <main className="container stack">
+        <Routes>
+          <Route path="/" element={<FoodTrackerPage />} />
+          <Route
+            path="/weight"
+            element={<WeightTrackerPage userId={userId} />}
+          />
+          <Route
+            path="/leaderboard"
+            element={<LeaderboardPage userId={userId} />}
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+      {location.pathname === "/" && (
+        <button
+          className="fab"
+          onClick={() => document.querySelector("textarea")?.focus()}
+        >
+          + Add
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FoodTrackerPage() {
   const [period, setPeriod] = useState<FilterKind>("today");
   const [mealFilter, setMealFilter] = useState<MealType | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -64,48 +137,27 @@ function Home() {
     await load();
   }
 
-  async function signOut() {
-    await supabase.auth.signOut();
-    window.location.reload();
-  }
-
   return (
     <div>
-      <header className="header">
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <h1 className="title">🥗 Health Tracker</h1>
-          <button className="chip ghost" onClick={signOut}>
-            Sign out
-          </button>
+      <AddEntryForm onCreate={handleCreate} />
+      <Filters
+        period={period}
+        onPeriodChange={setPeriod}
+        mealFilter={mealFilter}
+        onMealFilterChange={setMealFilter}
+      />
+      {loading && <div className="card">Loading…</div>}
+      {err && (
+        <div className="card" style={{ color: "#ffb4b4" }}>
+          {err}
         </div>
-      </header>
-      <main className="container stack">
-        <AddEntryForm onCreate={handleCreate} />
-        <Filters
-          period={period}
-          onPeriodChange={setPeriod}
-          mealFilter={mealFilter}
-          onMealFilterChange={setMealFilter}
-        />
-        {loading && <div className="card">Loading…</div>}
-        {err && (
-          <div className="card" style={{ color: "#ffb4b4" }}>
-            {err}
-          </div>
-        )}
-        <EntryList
-          entries={visible}
-          mealFilter={mealFilter}
-          period={period}
-          onChanged={load}
-        />
-      </main>
-      <button
-        className="fab"
-        onClick={() => document.querySelector("textarea")?.focus()}
-      >
-        + Add
-      </button>
+      )}
+      <EntryList
+        entries={visible}
+        mealFilter={mealFilter}
+        period={period}
+        onChanged={load}
+      />
     </div>
   );
 }
