@@ -59,11 +59,6 @@ export default function AddEntryForm({ onCreate }: Props) {
     setMeal(getDefaultMealType());
   }, []);
 
-  // Update meal type when datetime changes
-  useEffect(() => {
-    setMeal(getMealTypeFromDateTime(dt));
-  }, [dt]);
-
   function handleMealChange(newMeal: MealType | null) {
     setMeal(newMeal);
     if (newMeal) {
