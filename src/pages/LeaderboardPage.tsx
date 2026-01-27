@@ -41,24 +41,32 @@ export default function LeaderboardPage({ userId }: Props) {
   }, []);
 
   const rows = useMemo(() => {
-    const byUser: Record<string, DailyMetric> = {};
+    const byUser: Record<string, { first: DailyMetric; latest: DailyMetric }> =
+      {};
     metrics.forEach((m) => {
-      const current = byUser[m.user_id];
-      if (!current || m.occurred_at > current.occurred_at) {
-        byUser[m.user_id] = m;
+      if (!byUser[m.user_id]) {
+        byUser[m.user_id] = { first: m, latest: m };
+      } else {
+        if (m.occurred_at < byUser[m.user_id].first.occurred_at) {
+          byUser[m.user_id].first = m;
+        }
+        if (m.occurred_at > byUser[m.user_id].latest.occurred_at) {
+          byUser[m.user_id].latest = m;
+        }
       }
     });
     return members
       .map((member) => {
-        const latest = byUser[member.user_id];
-        const latestWeight = latest?.weight_kg ?? null;
-        const percentLoss = latestWeight
-          ? ((member.start_weight_kg - latestWeight) / member.start_weight_kg) *
-            100
-          : null;
+        const userMetrics = byUser[member.user_id];
+        const startWeight = userMetrics?.first.weight_kg ?? null;
+        const latestWeight = userMetrics?.latest.weight_kg ?? null;
+        const percentLoss =
+          startWeight && latestWeight
+            ? ((startWeight - latestWeight) / startWeight) * 100
+            : null;
         return {
           member,
-          latest,
+          latest: userMetrics?.latest ?? null,
           percentLoss,
         };
       })
@@ -90,6 +98,7 @@ export default function LeaderboardPage({ userId }: Props) {
           .plus({ days: 1 })
           .toUTC()
           .toISO()!,
+        challenge_id: DEFAULT_CHALLENGE_ID,
       });
       setMetrics(metricsRows);
     } catch (e: any) {
@@ -194,9 +203,9 @@ export default function LeaderboardPage({ userId }: Props) {
                   ).toFormat("MMM d")
                 : "—";
               const pct =
-                row.percentLoss != null && row.percentLoss > 0
-                  ? `${row.percentLoss.toFixed(1)}% loss`
-                  : "No loss";
+                row.percentLoss != null
+                  ? `${row.percentLoss.toFixed(1)}%`
+                  : "No data";
               return (
                 <div key={row.member.id} className="item">
                   <div className="item-body">

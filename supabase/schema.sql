@@ -99,11 +99,11 @@ create table if not exists public.challenge_members (
   id uuid primary key default gen_random_uuid(),
   challenge_id uuid not null references public.challenges(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  start_weight_kg numeric(5,1) not null,
+  start_weight_kg numeric(5,1),
   display_name text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint start_weight_positive check (start_weight_kg > 0),
+  constraint start_weight_positive check (start_weight_kg is null or start_weight_kg > 0),
   constraint display_name_length check (
     display_name is null or (char_length(trim(display_name)) between 3 and 40)
   ),

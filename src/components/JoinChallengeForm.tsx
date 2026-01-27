@@ -15,7 +15,6 @@ export default function JoinChallengeForm({
   onJoined,
 }: Props) {
   const [displayName, setDisplayName] = useState("");
-  const [weight, setWeight] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -29,18 +28,11 @@ export default function JoinChallengeForm({
       return;
     }
 
-    const weightNum = Number(weight);
-    if (!weight || Number.isNaN(weightNum) || weightNum <= 0) {
-      setErr("Enter your starting weight in kg (e.g., 89.5)");
-      return;
-    }
-
     setSaving(true);
     try {
       await joinChallenge({
         challenge_id: challenge.id,
         user_id: userId,
-        start_weight_kg: Number(weightNum.toFixed(1)),
         display_name: name,
       });
       onJoined();
@@ -72,20 +64,9 @@ export default function JoinChallengeForm({
             required
           />
           <div className="item-sub">
-            3–40 characters. Kept private until you join.
+            3–40 characters. Your starting weight will be taken from your first
+            daily entry.
           </div>
-        </div>
-        <div className="stack">
-          <label>Starting weight (kg)</label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            placeholder="89.5"
-            required
-          />
         </div>
         {err && (
           <div className="item-sub" style={{ color: "#ff6b6b" }}>

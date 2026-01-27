@@ -85,6 +85,7 @@ export default function WeightTrackerPage({ userId }: Props) {
       const rows = await listDailyMetricsInRange({
         startUtcISO: allTimeStart.toUTC().toISO()!,
         endUtcISO: allTimeEnd.toUTC().toISO()!,
+        user_id: userId,
       });
       setMetrics(rows);
       const target = rows.find((m) => m.local_date === date);
@@ -215,15 +216,20 @@ export default function WeightTrackerPage({ userId }: Props) {
   };
 
   const challengeMetrics = challenge ? metrics.filter(isInChallenge) : [];
-  const startWeight = member?.start_weight_kg;
+  const sortedChallengeMetrics = challengeMetrics.sort((a, b) =>
+    a.local_date < b.local_date ? -1 : 1,
+  );
+  const firstChallengeMetric =
+    sortedChallengeMetrics.length > 0 ? sortedChallengeMetrics[0] : null;
   const latestChallengeMetric =
-    challengeMetrics.length > 0
-      ? challengeMetrics.sort((a, b) =>
-          a.local_date > b.local_date ? -1 : 1,
-        )[0]
+    sortedChallengeMetrics.length > 0
+      ? sortedChallengeMetrics[sortedChallengeMetrics.length - 1]
       : null;
+  // Use first metric entry as baseline, fall back to member start weight
+  const startWeight =
+    firstChallengeMetric?.weight_kg ?? member?.start_weight_kg;
   const challengeProgress =
-    startWeight && latestChallengeMetric
+    startWeight && latestChallengeMetric && sortedChallengeMetrics.length > 1
       ? ((startWeight - latestChallengeMetric.weight_kg) / startWeight) * 100
       : null;
 
@@ -281,9 +287,27 @@ export default function WeightTrackerPage({ userId }: Props) {
                 {challenge && challengeProgress != null && (
                   <div
                     className="item-sub"
-                    style={{ color: "#22c55e", fontWeight: 600 }}
+                    style={{
+                      color: challengeProgress > 0 ? "#22c55e" : "#ef4444",
+                      fontWeight: 600,
+                    }}
                   >
-                    Challenge progress: {challengeProgress.toFixed(1)}% loss
+                    Challenge progress:{" "}
+                    {challengeProgress > 0
+                      ? `${challengeProgress.toFixed(1)}% loss`
+                      : challengeProgress < 0
+                        ? `${Math.abs(challengeProgress).toFixed(1)}% gain`
+                        : "No change"}
+                    <div
+                      style={{
+                        fontSize: "0.85em",
+                        fontWeight: 400,
+                        color: "#888",
+                      }}
+                    >
+                      (Start: {startWeight?.toFixed(1)}kg → Current:{" "}
+                      {latestChallengeMetric?.weight_kg.toFixed(1)}kg)
+                    </div>
                   </div>
                 )}
               </div>

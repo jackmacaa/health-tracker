@@ -28,14 +28,18 @@ export async function listDailyMetricsInRange(params: {
   startUtcISO: string;
   endUtcISO: string;
   challenge_id?: string | null;
+  user_id?: string;
 }): Promise<DailyMetric[]> {
-  const { startUtcISO, endUtcISO, challenge_id } = params;
+  const { startUtcISO, endUtcISO, challenge_id, user_id } = params;
   let query = supabase
     .from("daily_metrics")
     .select("*")
     .gte("occurred_at", startUtcISO)
     .lt("occurred_at", endUtcISO)
     .order("occurred_at", { ascending: true });
+  if (user_id !== undefined) {
+    query = query.eq("user_id", user_id);
+  }
   if (challenge_id !== undefined) {
     if (challenge_id === null) {
       query = query.is("challenge_id", null);

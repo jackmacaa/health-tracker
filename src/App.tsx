@@ -27,9 +27,24 @@ export default function App() {
 
 function AuthedApp({ userId }: { userId: string }) {
   const location = useLocation();
+  const [signingOut, setSigningOut] = useState(false);
+
   async function signOut() {
-    await supabase.auth.signOut();
-    window.location.reload();
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Sign out error:", error);
+      }
+    } catch (error) {
+      console.error("Sign out error:", error);
+    }
+    // Clear all local storage and session storage
+    localStorage.clear();
+    sessionStorage.clear();
+    // Force hard reload to clear all state
+    window.location.href = window.location.origin;
   }
 
   return (
@@ -57,8 +72,12 @@ function AuthedApp({ userId }: { userId: string }) {
             >
               Leaderboard
             </NavLink>
-            <button className="chip ghost" onClick={signOut}>
-              Sign out
+            <button
+              className="chip ghost"
+              onClick={signOut}
+              disabled={signingOut}
+            >
+              {signingOut ? "Signing out..." : "Sign out"}
             </button>
           </div>
         </div>

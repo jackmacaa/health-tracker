@@ -39,7 +39,7 @@ export async function getMyChallengeMember(
 export async function joinChallenge(input: {
   challenge_id: string;
   user_id: string;
-  start_weight_kg: number;
+  start_weight_kg?: number;
   display_name?: string;
 }): Promise<ChallengeMember> {
   const { data, error } = await supabase

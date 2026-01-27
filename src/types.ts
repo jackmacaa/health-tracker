@@ -32,7 +32,7 @@ export interface ChallengeMember {
   id: string;
   challenge_id: string;
   user_id: string;
-  start_weight_kg: number;
+  start_weight_kg: number | null;
   display_name: string | null;
   created_at: string;
   updated_at: string;
