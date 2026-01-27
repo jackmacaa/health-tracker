@@ -34,6 +34,12 @@ npm run preview -- --host
 
 - Netlify/Vercel: build `npm run build`, publish `dist`, set env vars `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 
+## New fitness pages
+
+- Weight Tracker: daily weight (kg to 0.1), steps, calories; unique per day with edit/overwrite.
+- Leaderboard: hard-coded challenge window; set VITE_CHALLENGE_ID to your challenge id in Supabase.
+- Apply the updated supabase/schema.sql (profiles, challenges, challenge_members, daily_metrics) before using these pages.
+
 ## Notes
 
 - Times are stored as UTC with `tz_offset_minutes` to preserve original local time.
