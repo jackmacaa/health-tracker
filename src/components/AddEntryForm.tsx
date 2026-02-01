@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { DateTime } from "luxon";
 import type { MealType } from "../types";
 import MealTypeChips from "./MealTypeChips";
+import EmojiPicker from "./EmojiPicker";
 
 interface Props {
   onCreate: (input: {
@@ -53,6 +54,7 @@ export default function AddEntryForm({ onCreate }: Props) {
   const [dt, setDt] = useState(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   useEffect(() => {
     // Set default meal type on mount
@@ -61,12 +63,20 @@ export default function AddEntryForm({ onCreate }: Props) {
 
   function handleMealChange(newMeal: MealType | null) {
     setMeal(newMeal);
+    setShowEmojiPicker(!!newMeal);
     if (newMeal) {
       // Set the datetime to the default time for this meal type, keeping the current date
       const currentDate = DateTime.fromISO(dt);
       const defaultTime = getDefaultTimeForMealType(newMeal, currentDate);
       setDt(defaultTime.toFormat("yyyy-MM-dd'T'HH:mm"));
     }
+  }
+
+  function handleEmojiSelect(emoji: string) {
+    setDescription((prev) => {
+      const trimmed = prev.trim();
+      return trimmed ? `${emoji} ${trimmed}` : emoji;
+    });
   }
 
   async function submit(e: React.FormEvent) {
@@ -147,8 +157,14 @@ export default function AddEntryForm({ onCreate }: Props) {
       </div>
       <div className="stack">
         <label>Meal type</label>
-        <MealTypeChips value={meal} onChange={setMeal} />
+        <MealTypeChips value={meal} onChange={handleMealChange} />
       </div>
+      {showEmojiPicker && (
+        <div className="stack">
+          <label>Quick add emoji</label>
+          <EmojiPicker mealType={meal} onSelect={handleEmojiSelect} />
+        </div>
+      )}
       <div className="stack">
         <label>Date & time</label>
         <input type="datetime-local" value={dt ?? ""} onChange={(e) => setDt(e.target.value)} />

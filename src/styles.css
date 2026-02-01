@@ -196,6 +196,84 @@ textarea {
 .footer-space {
   height: 64px;
 }
+
+/* Emoji Picker Styles */
+.emoji-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.emoji-row::-webkit-scrollbar {
+  height: 6px;
+}
+
+.emoji-row::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.emoji-row::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.emoji-row::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+.emoji-btn {
+  position: relative;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 28px;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  scroll-snap-align: start;
+}
+
+.emoji-btn:hover {
+  transform: scale(1.1);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.2);
+  z-index: 1;
+}
+
+.emoji-btn:active {
+  transform: scale(1.05);
+}
+
+.emoji-btn.is-favorite {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.emoji-btn.favorite {
+  border-color: #fbbf24;
+  background: #fef3c7;
+}
+
+.favorite-star {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+  line-height: 1;
+}
+
 @media (min-width: 640px) {
   .container {
     padding: 24px;
