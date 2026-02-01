@@ -106,8 +106,8 @@ textarea {
   background: transparent;
 }
 .btn {
-  padding: 12px 14px;
-  border-radius: 10px;
+  padding: 10px 10px;
+  border-radius: 8px;
   border: none;
   cursor: pointer;
   color: #ffffff;
@@ -116,6 +116,11 @@ textarea {
 .btn.secondary {
   background: #ffffff;
   color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn.blue {
+  background: #5768ff;
+  color: #ffffff;
   border: 1px solid var(--border);
 }
 .btn.danger {

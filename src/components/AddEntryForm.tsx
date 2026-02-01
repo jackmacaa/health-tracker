@@ -87,12 +87,35 @@ export default function AddEntryForm({ onCreate }: Props) {
   return (
     <form className="card stack" onSubmit={submit}>
       <div className="stack">
-        <label>What did you eat?</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="e.g., Greek yogurt, banana"
         />
+      </div>
+      <div className="row">
+        <button className="btn" type="submit" disabled={busy}>
+          {busy ? "Saving…" : "Save"}
+        </button>
+        <button
+          className="btn blue"
+          type="button"
+          onClick={() => {
+            setDt(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
+          }}
+        >
+          Now
+        </button>
+        <button
+          className="btn danger"
+          type="button"
+          onClick={() => {
+            setDescription("");
+            setDt(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
+          }}
+        >
+          Reset
+        </button>
       </div>
       <div className="stack">
         <label>Meal type</label>
@@ -107,21 +130,6 @@ export default function AddEntryForm({ onCreate }: Props) {
           {err}
         </div>
       )}
-      <div className="row">
-        <button className="btn" type="submit" disabled={busy}>
-          {busy ? "Saving…" : "Save"}
-        </button>
-        <button
-          className="btn secondary"
-          type="button"
-          onClick={() => {
-            setDescription("");
-            setDt(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
-          }}
-        >
-          Reset
-        </button>
-      </div>
     </form>
   );
 }
