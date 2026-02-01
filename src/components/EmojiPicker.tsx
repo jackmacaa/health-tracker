@@ -8,25 +8,107 @@ interface Props {
 
 const MEAL_EMOJIS: Record<MealType, string[]> = {
   breakfast: [
-    "🥐", "🥞", "🧇", "🥓", "🍳", "🥚", "🍞", "🥯",
-    "🥖", "🧈", "🥛", "☕", "🫖", "🥤", "🧃", "🍊",
-    "🍌", "🍎", "🍓", "🫐", "🥣", "🥗", "🧀", "🥜"
+    "🥓",
+    "🍳",
+    "🍞",
+    "☕",
+    "🍊",
+    "🍌",
+    "🍎",
+    "🍓",
+    "🧀",
+    "🥐",
+    "🥞",
+    "🥚",
+    "🥯",
+    "🥖",
+    "🥛",
+    "🫖",
+    "🥤",
+    "🧃",
+    "🫐",
+    "🥣",
+    "🥗",
+    "🥜",
   ],
   lunch: [
-    "🥪", "🌮", "🌯", "🥙", "🍕", "🍔", "🍟", "🌭",
-    "🥗", "🥘", "🍝", "🍜", "🍲", "🥫", "🍱", "🍛",
-    "🍣", "🥟", "🦪", "🍤", "🥡", "🥬", "🥒", "🍅"
+    "🥪",
+    "🍜",
+    "🍕",
+    "🍔",
+    "🍟",
+    "🥬",
+    "🥒",
+    "🍅",
+    "🌭",
+    "🥗",
+    "🥘",
+    "🍝",
+    "🌮",
+    "🌯",
+    "🥙",
+    "🍲",
+    "🥫",
+    "🍱",
+    "🍛",
+    "🍣",
+    "🥟",
+    "🦪",
+    "🍤",
+    "🥡",
   ],
   dinner: [
-    "🍖", "🍗", "🥩", "🍤", "🦞", "🦐", "🍣", "🍱",
-    "🍝", "🍜", "🍲", "🥘", "🍛", "🍕", "🥗", "🍔",
-    "🌮", "🥙", "🦴", "🥟", "🥡", "🍚", "🍢", "🧆"
+    "🥗",
+    "🍗",
+    "🥦",
+    "🥩",
+    "🧅",
+    "🍕",
+    "🍔",
+    "🍝",
+    "🍜",
+    "🍲",
+    "🥘",
+    "🍛",
+    "🌮",
+    "🥙",
+    "🍤",
+    "🍖",
+    "🦞",
+    "🍣",
+    "🍱",
+    "🦐",
+    "🦴",
+    "🥟",
+    "🥡",
+    "🍚",
+    "🍢",
+    "🧆",
   ],
   snack: [
-    "🍪", "🍩", "🧁", "🍰", "🎂", "🍫", "🍬", "🍭",
-    "🍮", "🍯", "🍿", "🥨", "🍘", "🍙", "🍚", "🥠",
-    "🧊", "🍦", "🍧", "🍨", "🥜", "🌰", "🥔", "🍇"
-  ]
+    "☕",
+    "🍇",
+    "🍺",
+    "🍉",
+    "🥭",
+    "🍍",
+    "🍑",
+    "🍒",
+    "🥝",
+    "🍊",
+    "🍌",
+    "🍎",
+    "🍓",
+    "🧊",
+    "🍦",
+    "🍪",
+    "🥜",
+    "🌰",
+    "🥔",
+    "🍇",
+    "🍿",
+    "🥨",
+  ],
 };
 
 const STORAGE_KEY = "health-tracker-favorite-emojis";
@@ -91,7 +173,7 @@ export default function EmojiPicker({ mealType, onSelect }: Props) {
           </div>
         </div>
       )}
-      
+
       <div className="stack" style={{ gap: "0.25rem" }}>
         <div style={{ fontSize: "0.75rem", opacity: 0.7 }}>
           {mealType.charAt(0).toUpperCase() + mealType.slice(1)} options (swipe to see more)
@@ -104,12 +186,14 @@ export default function EmojiPicker({ mealType, onSelect }: Props) {
               className={`emoji-btn ${favorites.includes(emoji) ? "is-favorite" : ""}`}
               onClick={() => handleEmojiClick(emoji)}
               onDoubleClick={() => toggleFavorite(emoji)}
-              title={favorites.includes(emoji) ? "Double-click to unfavorite" : "Double-click to favorite"}
+              title={
+                favorites.includes(emoji)
+                  ? "Double-click to unfavorite"
+                  : "Double-click to favorite"
+              }
             >
               {emoji}
-              {favorites.includes(emoji) && (
-                <span className="favorite-star">⭐</span>
-              )}
+              {favorites.includes(emoji) && <span className="favorite-star">⭐</span>}
             </button>
           ))}
         </div>

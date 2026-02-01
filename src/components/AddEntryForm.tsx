@@ -29,10 +29,7 @@ function getMealTypeFromDateTime(dtString: string): MealType {
   return "dinner";
 }
 
-function getDefaultTimeForMealType(
-  mealType: MealType,
-  baseDate?: DateTime,
-): DateTime {
+function getDefaultTimeForMealType(mealType: MealType, baseDate?: DateTime): DateTime {
   const base = baseDate || DateTime.local();
   const timeMap: Record<MealType, number> = {
     breakfast: 8,
