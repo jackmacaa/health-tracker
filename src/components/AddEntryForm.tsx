@@ -51,7 +51,7 @@ export default function AddEntryForm({ onCreate }: Props) {
   const [dt, setDt] = useState(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(true);
 
   useEffect(() => {
     // Set default meal type on mount
@@ -128,28 +128,30 @@ export default function AddEntryForm({ onCreate }: Props) {
           placeholder="e.g., Greek yogurt, banana"
         />
       </div>
+      <button className="btn" type="submit" disabled={busy}>
+        {busy ? "💾 Saving…" : "💾 Save"}
+      </button>
       <div className="row">
-        <button className="btn" type="submit" disabled={busy}>
-          {busy ? "Saving…" : "Save"}
-        </button>
         <button
           className="btn blue"
           type="button"
+          style={{ flex: 1 }}
           onClick={() => {
             setDt(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
           }}
         >
-          Now
+          🕐 Time Now
         </button>
         <button
           className="btn danger"
           type="button"
+          style={{ flex: 1 }}
           onClick={() => {
             setDescription("");
             setDt(DateTime.local().toFormat("yyyy-MM-dd'T'HH:mm"));
           }}
         >
-          Reset
+          🔄 Reset All
         </button>
       </div>
       <div className="stack">

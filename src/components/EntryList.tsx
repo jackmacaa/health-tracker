@@ -25,15 +25,8 @@ const MEAL_LABELS: Record<MealType, string> = {
   snack: "Snack",
 };
 
-export default function EntryList({
-  entries,
-  mealFilter,
-  period,
-  onChanged,
-}: Props) {
-  const filtered = entries.filter(
-    (e) => !mealFilter || e.meal_type === mealFilter,
-  );
+export default function EntryList({ entries, mealFilter, period, onChanged }: Props) {
+  const filtered = entries.filter((e) => !mealFilter || e.meal_type === mealFilter);
   if (filtered.length === 0) return <div className="empty">No entries yet</div>;
 
   if (period === "today") {
@@ -76,10 +69,7 @@ export default function EntryList({
     const groupedByDate = new Map<string, Map<MealType, Entry[]>>();
 
     filtered.forEach((e) => {
-      const localDate = toLocalDateTime(
-        e.occurred_at,
-        e.tz_offset_minutes,
-      ).toISODate();
+      const localDate = toLocalDateTime(e.occurred_at, e.tz_offset_minutes).toISODate();
 
       if (!groupedByDate.has(localDate!)) {
         groupedByDate.set(localDate!, new Map());
@@ -144,13 +134,7 @@ export default function EntryList({
   }
 }
 
-function EntryItem({
-  entry,
-  onChanged,
-}: {
-  entry: Entry;
-  onChanged: () => void;
-}) {
+function EntryItem({ entry, onChanged }: { entry: Entry; onChanged: () => void }) {
   const [editing, setEditing] = useState(false);
   const [desc, setDesc] = useState(entry.description);
   const [busy, setBusy] = useState(false);
@@ -224,10 +208,10 @@ function EntryItem({
         ) : (
           <>
             <button className="btn secondary" onClick={() => setEditing(true)}>
-              Edit
+              ✏️
             </button>
             <button className="btn danger" onClick={remove} disabled={busy}>
-              Delete
+              🗑️
             </button>
           </>
         )}
