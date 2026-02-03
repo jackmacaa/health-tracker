@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import type { MealType } from "../types";
 import MealTypeChips from "./MealTypeChips";
 import EmojiPicker from "./EmojiPicker";
+import { MEAL_TIME_RANGES } from "../constants";
 
 interface Props {
   onCreate: (input: {
@@ -15,8 +16,8 @@ interface Props {
 
 function getDefaultMealType(): MealType {
   const hour = DateTime.local().hour;
-  if (hour < 10) return "breakfast";
-  if (hour < 16) return "lunch";
+  if (hour < MEAL_TIME_RANGES.lunch.start) return "breakfast";
+  if (hour < MEAL_TIME_RANGES.dinner.start) return "lunch";
   return "dinner";
 }
 
@@ -24,8 +25,8 @@ function getMealTypeFromDateTime(dtString: string): MealType {
   const parsed = DateTime.fromISO(dtString);
   if (!parsed.isValid) return getDefaultMealType();
   const hour = parsed.hour;
-  if (hour < 10) return "breakfast";
-  if (hour < 16) return "lunch";
+  if (hour < MEAL_TIME_RANGES.lunch.start) return "breakfast";
+  if (hour < MEAL_TIME_RANGES.dinner.start) return "lunch";
   return "dinner";
 }
 

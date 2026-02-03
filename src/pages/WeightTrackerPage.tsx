@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import { DEFAULT_CHALLENGE_ID } from "../config";
-import {
-  listDailyMetricsInRange,
-  upsertDailyMetric,
-  deleteDailyMetric,
-} from "../api/dailyMetrics";
+import { listDailyMetricsInRange, upsertDailyMetric, deleteDailyMetric } from "../api/dailyMetrics";
 import { getChallenge, getMyChallengeMember } from "../api/challenges";
 import JoinChallengeForm from "../components/JoinChallengeForm";
 import type { Challenge, ChallengeMember, DailyMetric } from "../types";
 import { toLocalDateTime, tzOffsetNowMinutes } from "../lib/date";
 import Sparkline from "../components/Sparkline";
+import BarChart from "../components/BarChart";
 
 interface Props {
   userId: string;
@@ -28,14 +25,20 @@ export default function WeightTrackerPage({ userId }: Props) {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [period, setPeriod] = useState<"week" | "month" | "90days" | "all">(
-    "month",
-  );
+  const [period, setPeriod] = useState<"week" | "month" | "90days" | "all">("month");
   const [showChallengeOnly, setShowChallengeOnly] = useState(false);
 
   useEffect(() => {
     load({ showSpinner: true });
   }, []);
+
+  const isInChallenge = (metric: DailyMetric) => {
+    if (!challenge) return false;
+    const metricDate = DateTime.fromISO(metric.local_date);
+    const start = DateTime.fromISO(challenge.start_at).startOf("day");
+    const end = DateTime.fromISO(challenge.end_at).endOf("day");
+    return metricDate >= start && metricDate <= end;
+  };
 
   const chartPoints = useMemo(() => {
     return metrics.map((m) => {
@@ -45,6 +48,62 @@ export default function WeightTrackerPage({ userId }: Props) {
         value: m.weight_kg,
       };
     });
+  }, [metrics]);
+
+  const stepsChartPoints = useMemo(() => {
+    return metrics
+      .filter((m) => m.steps != null)
+      .map((m) => {
+        const local = toLocalDateTime(m.occurred_at, m.tz_offset_minutes);
+        return {
+          label: local.toFormat("MMM d"),
+          value: m.steps!,
+        };
+      });
+  }, [metrics]);
+
+  const challengeStats = useMemo(() => {
+    if (!challenge) return null;
+    const challengeMetrics = metrics.filter(isInChallenge);
+    const metricsWithSteps = challengeMetrics.filter((m) => m.steps != null);
+    const metricsWithCalories = challengeMetrics.filter((m) => m.calories_burned != null);
+
+    return {
+      avgSteps:
+        metricsWithSteps.length > 0
+          ? Math.round(
+              metricsWithSteps.reduce((sum, m) => sum + m.steps!, 0) / metricsWithSteps.length,
+            )
+          : null,
+      avgCalories:
+        metricsWithCalories.length > 0
+          ? Math.round(
+              metricsWithCalories.reduce((sum, m) => sum + m.calories_burned!, 0) /
+                metricsWithCalories.length,
+            )
+          : null,
+    };
+  }, [metrics, challenge]);
+
+  const overallStats = useMemo(() => {
+    const metricsWithSteps = metrics.filter((m) => m.steps != null);
+    const metricsWithCalories = metrics.filter((m) => m.calories_burned != null);
+
+    return {
+      avgSteps:
+        metricsWithSteps.length > 0
+          ? Math.round(
+              metricsWithSteps.reduce((sum, m) => sum + m.steps!, 0) / metricsWithSteps.length,
+            )
+          : null,
+      avgCalories:
+        metricsWithCalories.length > 0
+          ? Math.round(
+              metricsWithCalories.reduce((sum, m) => sum + m.calories_burned!, 0) /
+                metricsWithCalories.length,
+            )
+          : null,
+    };
   }, [metrics]);
 
   const trendDays = useMemo(() => {
@@ -62,9 +121,7 @@ export default function WeightTrackerPage({ userId }: Props) {
     setErr(null);
     try {
       const challengeId = DEFAULT_CHALLENGE_ID || null;
-      const foundChallenge = challengeId
-        ? await getChallenge(challengeId)
-        : null;
+      const foundChallenge = challengeId ? await getChallenge(challengeId) : null;
       setChallenge(foundChallenge);
 
       if (!foundChallenge) {
@@ -92,9 +149,7 @@ export default function WeightTrackerPage({ userId }: Props) {
       if (target) {
         setWeight(String(target.weight_kg));
         setSteps(target.steps != null ? String(target.steps) : "");
-        setCalories(
-          target.calories_burned != null ? String(target.calories_burned) : "",
-        );
+        setCalories(target.calories_burned != null ? String(target.calories_burned) : "");
       } else {
         setWeight("");
         setSteps("");
@@ -112,13 +167,10 @@ export default function WeightTrackerPage({ userId }: Props) {
     if (target) {
       setWeight(String(target.weight_kg));
       setSteps(target.steps != null ? String(target.steps) : "");
-      setCalories(
-        target.calories_burned != null ? String(target.calories_burned) : "",
-      );
+      setCalories(target.calories_burned != null ? String(target.calories_burned) : "");
     } else {
       // If no entry for this date, prefill weight with most recent entry
-      const mostRecent =
-        metrics.length > 0 ? metrics[metrics.length - 1] : null;
+      const mostRecent = metrics.length > 0 ? metrics[metrics.length - 1] : null;
       if (mostRecent) {
         setWeight(String(mostRecent.weight_kg));
       } else {
@@ -182,9 +234,7 @@ export default function WeightTrackerPage({ userId }: Props) {
     setDate(metric.local_date);
     setWeight(String(metric.weight_kg));
     setSteps(metric.steps != null ? String(metric.steps) : "");
-    setCalories(
-      metric.calories_burned != null ? String(metric.calories_burned) : "",
-    );
+    setCalories(metric.calories_burned != null ? String(metric.calories_burned) : "");
     setSuccess(null);
     setErr(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -207,27 +257,17 @@ export default function WeightTrackerPage({ userId }: Props) {
     }
   }
 
-  const isInChallenge = (metric: DailyMetric) => {
-    if (!challenge) return false;
-    const metricDate = DateTime.fromISO(metric.local_date);
-    const start = DateTime.fromISO(challenge.start_at).startOf("day");
-    const end = DateTime.fromISO(challenge.end_at).endOf("day");
-    return metricDate >= start && metricDate <= end;
-  };
-
   const challengeMetrics = challenge ? metrics.filter(isInChallenge) : [];
   const sortedChallengeMetrics = challengeMetrics.sort((a, b) =>
     a.local_date < b.local_date ? -1 : 1,
   );
-  const firstChallengeMetric =
-    sortedChallengeMetrics.length > 0 ? sortedChallengeMetrics[0] : null;
+  const firstChallengeMetric = sortedChallengeMetrics.length > 0 ? sortedChallengeMetrics[0] : null;
   const latestChallengeMetric =
     sortedChallengeMetrics.length > 0
       ? sortedChallengeMetrics[sortedChallengeMetrics.length - 1]
       : null;
   // Use first metric entry as baseline, fall back to member start weight
-  const startWeight =
-    firstChallengeMetric?.weight_kg ?? member?.start_weight_kg;
+  const startWeight = firstChallengeMetric?.weight_kg ?? member?.start_weight_kg;
   const challengeProgress =
     startWeight && latestChallengeMetric && sortedChallengeMetrics.length > 1
       ? ((startWeight - latestChallengeMetric.weight_kg) / startWeight) * 100
@@ -265,7 +305,7 @@ export default function WeightTrackerPage({ userId }: Props) {
 
   return (
     <div className="stack">
-      {loading && <div className="card">Loading…</div>}
+      {loading && <div className="card">⏳ Loading…</div>}
       {!loading && challenge && !member && (
         <JoinChallengeForm
           userId={userId}
@@ -368,22 +408,17 @@ export default function WeightTrackerPage({ userId }: Props) {
                   {success}
                 </div>
               )}
-              <div className="row">
-                <button className="btn" type="submit" disabled={saving}>
-                  {saving ? "Saving…" : "Save"}
-                </button>
-                {loading && <div className="item-sub">Loading…</div>}
-              </div>
+              <button className="btn" type="submit" disabled={saving}>
+                {saving ? "💾 Saving…" : "💾 Save"}
+              </button>
             </form>
           </div>
 
           <div className="card stack">
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <div style={{ fontWeight: 600 }}>Trend</div>
+              <div style={{ fontWeight: 600 }}>⚖️ Trend 📈</div>
               <div className="item-sub">
-                {metrics.length === 0
-                  ? "No weights yet"
-                  : `Last ${trendDays} days`}
+                {metrics.length === 0 ? "No weights yet" : `Last ${trendDays} days`}
               </div>
             </div>
             {metrics.length === 0 ? (
@@ -392,6 +427,62 @@ export default function WeightTrackerPage({ userId }: Props) {
               <Sparkline data={chartPoints} height={90} />
             )}
           </div>
+
+          <div className="card stack">
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <div style={{ fontWeight: 600 }}>🚶 Steps 📊</div>
+              <div className="item-sub">
+                {stepsChartPoints.length === 0
+                  ? "No steps logged"
+                  : `${stepsChartPoints.length} days logged`}
+              </div>
+            </div>
+            {stepsChartPoints.length === 0 ? (
+              <div className="empty">No steps logged yet</div>
+            ) : (
+              <BarChart data={stepsChartPoints} height={90} color="#3b82f6" />
+            )}
+          </div>
+
+          {(overallStats.avgSteps != null || overallStats.avgCalories != null) && (
+            <div className="card stack">
+              <div style={{ fontWeight: 600 }}>🧮 Averages</div>
+              <div className="row" style={{ gap: "16px", flexWrap: "wrap" }}>
+                {overallStats.avgSteps != null && (
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: "120px",
+                      padding: "12px",
+                      background: "#eff6ff",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <div style={{ fontSize: "0.75em", color: "#666" }}>🚶 Avg Steps</div>
+                    <div style={{ fontSize: "1.5em", fontWeight: 600, color: "#3b82f6" }}>
+                      {overallStats.avgSteps.toLocaleString()}
+                    </div>
+                  </div>
+                )}
+                {overallStats.avgCalories != null && (
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: "120px",
+                      padding: "12px",
+                      background: "#fef3f2",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <div style={{ fontSize: "0.75em", color: "#666" }}>🔥 Avg Calories</div>
+                    <div style={{ fontSize: "1.5em", fontWeight: 600, color: "#ef4444" }}>
+                      {overallStats.avgCalories.toLocaleString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="card stack">
             <div className="stack" style={{ gap: "12px" }}>
@@ -447,10 +538,7 @@ export default function WeightTrackerPage({ userId }: Props) {
             ) : (
               <div className="list">
                 {infoRows.map((m) => {
-                  const local = toLocalDateTime(
-                    m.occurred_at,
-                    m.tz_offset_minutes,
-                  );
+                  const local = toLocalDateTime(m.occurred_at, m.tz_offset_minutes);
                   const inChallenge = isInChallenge(m);
                   return (
                     <div key={m.id} className="item">
@@ -476,9 +564,7 @@ export default function WeightTrackerPage({ userId }: Props) {
                         <div className="item-sub">
                           Weight {m.weight_kg.toFixed(1)} kg
                           {m.steps != null ? ` · ${m.steps} steps` : ""}
-                          {m.calories_burned != null
-                            ? ` · ${m.calories_burned} cal burned`
-                            : ""}
+                          {m.calories_burned != null ? ` · ${m.calories_burned} cal burned` : ""}
                         </div>
                       </div>
                       <div className="row">
@@ -488,7 +574,7 @@ export default function WeightTrackerPage({ userId }: Props) {
                           onClick={() => editEntry(m)}
                           disabled={saving}
                         >
-                          Edit
+                          ✏️
                         </button>
                         <button
                           className="btn danger"
@@ -496,7 +582,7 @@ export default function WeightTrackerPage({ userId }: Props) {
                           onClick={() => deleteEntry(m)}
                           disabled={saving}
                         >
-                          Delete
+                          🗑️
                         </button>
                       </div>
                     </div>

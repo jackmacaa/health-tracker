@@ -165,7 +165,7 @@ function FoodTrackerPage() {
         mealFilter={mealFilter}
         onMealFilterChange={setMealFilter}
       />
-      {loading && <div className="card">Loading…</div>}
+      {loading && <div className="card">⏳ Loading…</div>}
       {err && (
         <div className="card" style={{ color: "#ffb4b4" }}>
           {err}

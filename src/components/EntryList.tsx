@@ -3,6 +3,7 @@ import type { Entry, MealType, FilterKind } from "../types";
 import { DateTime } from "luxon";
 import { toDisplayTime, toLocalDateTime } from "../lib/date";
 import { deleteEntry, updateEntry } from "../api/entries";
+import { MEAL_ORDER, MEAL_LABELS, MEAL_TIME_RANGES } from "../constants";
 
 interface Props {
   entries: Entry[];
@@ -11,32 +12,38 @@ interface Props {
   onChanged: () => void;
 }
 
-const MEAL_ORDER: Record<MealType, number> = {
-  breakfast: 0,
-  lunch: 1,
-  dinner: 2,
-  snack: 3,
-};
+// Determine which meal section a snack should appear in based on time
+function getMealSectionForSnack(entry: Entry): MealType {
+  const localTime = toLocalDateTime(entry.occurred_at, entry.tz_offset_minutes);
+  const hour = localTime.hour;
 
-const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-  snack: "Snack",
-};
+  if (hour >= MEAL_TIME_RANGES.breakfast.start && hour < MEAL_TIME_RANGES.breakfast.end) {
+    return "breakfast";
+  } else if (hour >= MEAL_TIME_RANGES.lunch.start && hour < MEAL_TIME_RANGES.lunch.end) {
+    return "lunch";
+  } else {
+    return "dinner";
+  }
+}
+
+// Get the meal section for grouping purposes
+function getMealSection(entry: Entry): MealType {
+  return entry.meal_type === "snack" ? getMealSectionForSnack(entry) : entry.meal_type;
+}
 
 export default function EntryList({ entries, mealFilter, period, onChanged }: Props) {
   const filtered = entries.filter((e) => !mealFilter || e.meal_type === mealFilter);
   if (filtered.length === 0) return <div className="empty">No entries yet</div>;
 
   if (period === "today") {
-    // Group by meal type only
+    // Group by meal section (snacks are grouped by time into appropriate meal)
     const grouped = new Map<MealType, Entry[]>();
     filtered.forEach((e) => {
-      if (!grouped.has(e.meal_type)) {
-        grouped.set(e.meal_type, []);
+      const section = getMealSection(e);
+      if (!grouped.has(section)) {
+        grouped.set(section, []);
       }
-      grouped.get(e.meal_type)!.push(e);
+      grouped.get(section)!.push(e);
     });
 
     const sortedMeals = Array.from(grouped.entries()).sort(
@@ -70,15 +77,16 @@ export default function EntryList({ entries, mealFilter, period, onChanged }: Pr
 
     filtered.forEach((e) => {
       const localDate = toLocalDateTime(e.occurred_at, e.tz_offset_minutes).toISODate();
+      const section = getMealSection(e);
 
       if (!groupedByDate.has(localDate!)) {
         groupedByDate.set(localDate!, new Map());
       }
       const dateGroup = groupedByDate.get(localDate!)!;
-      if (!dateGroup.has(e.meal_type)) {
-        dateGroup.set(e.meal_type, []);
+      if (!dateGroup.has(section)) {
+        dateGroup.set(section, []);
       }
-      dateGroup.get(e.meal_type)!.push(e);
+      dateGroup.get(section)!.push(e);
     });
 
     // Sort dates in descending order (newest first)
@@ -180,7 +188,24 @@ function EntryItem({ entry, onChanged }: { entry: Entry; onChanged: () => void }
         {editing ? (
           <input value={desc} onChange={(e) => setDesc(e.target.value)} />
         ) : (
-          <div className="item-title">{entry.description}</div>
+          <div className="item-title">
+            {entry.description}
+            {entry.meal_type === "snack" && (
+              <span
+                style={{
+                  marginLeft: "0.5rem",
+                  fontSize: "0.75em",
+                  padding: "0.15rem 0.4rem",
+                  backgroundColor: "#f0f0f0",
+                  borderRadius: "4px",
+                  color: "#666",
+                  fontWeight: "normal",
+                }}
+              >
+                snack
+              </span>
+            )}
+          </div>
         )}
         <div className="item-sub">{sub}</div>
         {err && (
@@ -193,7 +218,7 @@ function EntryItem({ entry, onChanged }: { entry: Entry; onChanged: () => void }
         {editing ? (
           <>
             <button className="btn" onClick={save} disabled={busy}>
-              {busy ? "Saving…" : "Save"}
+              {busy ? "💾 Saving…" : "💾 Save"}
             </button>
             <button
               className="btn secondary"

@@ -24,6 +24,7 @@ export default function LeaderboardPage({ userId }: Props) {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showDisplayNameForm, setShowDisplayNameForm] = useState(false);
 
   useEffect(() => {
     load();
@@ -36,13 +37,16 @@ export default function LeaderboardPage({ userId }: Props) {
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
+  // Show display name form by default if no name is set
+  useEffect(() => {
+    setShowDisplayNameForm(!displayName || displayName.trim().length === 0);
+  }, [displayName]);
+
   const rows = useMemo(() => {
-    const byUser: Record<string, { first: DailyMetric; latest: DailyMetric }> =
-      {};
+    const byUser: Record<string, { first: DailyMetric; latest: DailyMetric }> = {};
 
     metrics.forEach((m) => {
       if (!byUser[m.user_id]) {
@@ -50,12 +54,8 @@ export default function LeaderboardPage({ userId }: Props) {
       } else {
         // Convert to proper DateTime objects for comparison
         const mTime = new Date(m.occurred_at).getTime();
-        const firstTime = new Date(
-          byUser[m.user_id].first.occurred_at,
-        ).getTime();
-        const latestTime = new Date(
-          byUser[m.user_id].latest.occurred_at,
-        ).getTime();
+        const firstTime = new Date(byUser[m.user_id].first.occurred_at).getTime();
+        const latestTime = new Date(byUser[m.user_id].latest.occurred_at).getTime();
 
         if (mTime < firstTime) {
           byUser[m.user_id].first = m;
@@ -72,9 +72,7 @@ export default function LeaderboardPage({ userId }: Props) {
         const startWeight = userMetrics?.first.weight_kg ?? null;
         const latestWeight = userMetrics?.latest.weight_kg ?? null;
         const percentLoss =
-          startWeight && latestWeight
-            ? ((startWeight - latestWeight) / startWeight) * 100
-            : null;
+          startWeight && latestWeight ? ((startWeight - latestWeight) / startWeight) * 100 : null;
 
         return {
           member,
@@ -82,16 +80,12 @@ export default function LeaderboardPage({ userId }: Props) {
           percentLoss,
         };
       })
-      .sort(
-        (a, b) => (b.percentLoss ?? -Infinity) - (a.percentLoss ?? -Infinity),
-      );
+      .sort((a, b) => (b.percentLoss ?? -Infinity) - (a.percentLoss ?? -Infinity));
   }, [members, metrics]);
 
   async function load() {
     if (!DEFAULT_CHALLENGE_ID) {
-      setErr(
-        "No challenge configured. Set VITE_CHALLENGE_ID to use the leaderboard.",
-      );
+      setErr("No challenge configured. Set VITE_CHALLENGE_ID to use the leaderboard.");
       return;
     }
     setLoading(true);
@@ -148,34 +142,35 @@ export default function LeaderboardPage({ userId }: Props) {
         <div style={{ fontWeight: 600 }}>Challenge Leaderboard</div>
         {challenge ? (
           <div className="item-sub">
-            {challenge.name} ·{" "}
-            {DateTime.fromISO(challenge.start_at).toFormat("MMM d")} –{" "}
+            {challenge.name} · {DateTime.fromISO(challenge.start_at).toFormat("MMM d")} –{" "}
             {DateTime.fromISO(challenge.end_at).toFormat("MMM d")}
           </div>
         ) : (
-          <div className="item-sub">
-            Configure VITE_CHALLENGE_ID to view standings.
-          </div>
+          <div className="item-sub">Configure VITE_CHALLENGE_ID to view standings.</div>
         )}
         <div className="stack">
-          <label>Display name</label>
-          <div className="row" style={{ gap: "8px" }}>
+          <button
+            className="btn secondary"
+            type="button"
+            onClick={() => setShowDisplayNameForm(!showDisplayNameForm)}
+          >
+            {showDisplayNameForm ? "✕ Cancel" : "✏️ Edit username"}
+          </button>
+        </div>
+        {showDisplayNameForm && (
+          <div className="stack">
+            <label>Display name</label>
             <input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Pick a handle"
             />
-            <button
-              className="btn secondary"
-              type="button"
-              onClick={saveDisplayName}
-              disabled={saving}
-            >
-              {saving ? "Saving…" : "Save"}
+            <button className="btn" type="button" onClick={saveDisplayName} disabled={saving}>
+              {saving ? "💾 Saving…" : "💾 Save"}
             </button>
+            <div className="item-sub">This appears on the leaderboard.</div>
           </div>
-          <div className="item-sub">This appears on the leaderboard.</div>
-        </div>
+        )}
         {err && (
           <div className="item-sub" style={{ color: "#ff6b6b" }}>
             {err}
@@ -191,13 +186,8 @@ export default function LeaderboardPage({ userId }: Props) {
       <div className="card stack">
         <div style={{ fontWeight: 600 }}>Standings</div>
         <div className="row" style={{ gap: "8px" }}>
-          <button
-            className="btn secondary"
-            type="button"
-            onClick={() => load()}
-            disabled={loading}
-          >
-            {loading ? "Loading…" : "Refresh"}
+          <button className="btn blue" type="button" onClick={() => load()} disabled={loading}>
+            {loading ? "⏳ Loading…" : "🔄 Refresh"}
           </button>
         </div>
         {loading && <div className="item-sub">Loading…</div>}
@@ -206,14 +196,11 @@ export default function LeaderboardPage({ userId }: Props) {
         ) : (
           <div className="list">
             {rows.map((row, idx) => {
-              const name =
-                row.member.display_name ||
-                `User ${row.member.user_id.slice(0, 4)}`;
+              const name = row.member.display_name || `User ${row.member.user_id.slice(0, 4)}`;
               const latest = row.latest
-                ? toLocalDateTime(
-                    row.latest.occurred_at,
-                    row.latest.tz_offset_minutes,
-                  ).toFormat("MMM d")
+                ? toLocalDateTime(row.latest.occurred_at, row.latest.tz_offset_minutes).toFormat(
+                    "MMM d",
+                  )
                 : "—";
               const pct =
                 row.percentLoss != null
@@ -228,8 +215,7 @@ export default function LeaderboardPage({ userId }: Props) {
                       #{idx + 1} {name}
                     </div>
                     <div className="item-sub">
-                      Last updated {latest} ·{" "}
-                      <span style={{ fontWeight: 600 }}>{pct}</span>
+                      Last updated {latest} · <span style={{ fontWeight: 600 }}>{pct}</span>
                     </div>
                   </div>
                 </div>
