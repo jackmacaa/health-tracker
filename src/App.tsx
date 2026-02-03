@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  NavLink,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router-dom";
+import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import AuthGate from "./components/AuthGate";
 import AddEntryForm from "./components/AddEntryForm";
 import Filters from "./components/Filters";
@@ -13,11 +7,7 @@ import EntryList from "./components/EntryList";
 import WeightTrackerPage from "./pages/WeightTrackerPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 import type { Entry, FilterKind, MealType } from "./types";
-import {
-  isInPeriodByRowOffset,
-  toLocalDateTime,
-  widenedUtcFetchBounds,
-} from "./lib/date";
+import { isInPeriodByRowOffset, toLocalDateTime, widenedUtcFetchBounds } from "./lib/date";
 import { createEntry, listEntriesInRange } from "./api/entries";
 import { supabase } from "./lib/supabase";
 
@@ -51,32 +41,31 @@ function AuthedApp({ userId }: { userId: string }) {
     <div>
       <header className="header">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <h1 className="title">B2S</h1>
+          <h1
+            className="title"
+            style={{
+              fontWeight: 800,
+              letterSpacing: "2px",
+              fontSize: "24px",
+              textShadow: "0 0 20px rgba(22, 163, 74, 0.5), 0 2px 4px rgba(0,0,0,0.1)",
+            }}
+          >
+            🌍B2S
+          </h1>
           <div className="row" style={{ gap: "8px" }}>
-            <NavLink
-              className={({ isActive }) => `tab${isActive ? " active" : ""}`}
-              to="/"
-              end
-            >
-              Food
+            <NavLink className={({ isActive }) => `tab${isActive ? " active" : ""}`} to="/" end>
+              🍽️
             </NavLink>
-            <NavLink
-              className={({ isActive }) => `tab${isActive ? " active" : ""}`}
-              to="/weight"
-            >
-              Weight
+            <NavLink className={({ isActive }) => `tab${isActive ? " active" : ""}`} to="/weight">
+              📝
             </NavLink>
             <NavLink
               className={({ isActive }) => `tab${isActive ? " active" : ""}`}
               to="/leaderboard"
             >
-              Leaderboard
+              🏆
             </NavLink>
-            <button
-              className="chip ghost"
-              onClick={signOut}
-              disabled={signingOut}
-            >
+            <button className="chip ghost" onClick={signOut} disabled={signingOut}>
               {signingOut ? "Signing out..." : "Sign out"}
             </button>
           </div>
@@ -85,22 +74,13 @@ function AuthedApp({ userId }: { userId: string }) {
       <main className="container stack">
         <Routes>
           <Route path="/" element={<FoodTrackerPage />} />
-          <Route
-            path="/weight"
-            element={<WeightTrackerPage userId={userId} />}
-          />
-          <Route
-            path="/leaderboard"
-            element={<LeaderboardPage userId={userId} />}
-          />
+          <Route path="/weight" element={<WeightTrackerPage userId={userId} />} />
+          <Route path="/leaderboard" element={<LeaderboardPage userId={userId} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       {location.pathname === "/" && (
-        <button
-          className="fab"
-          onClick={() => document.querySelector("textarea")?.focus()}
-        >
+        <button className="fab" onClick={() => document.querySelector("textarea")?.focus()}>
           + Add
         </button>
       )}
@@ -171,12 +151,7 @@ function FoodTrackerPage() {
           {err}
         </div>
       )}
-      <EntryList
-        entries={visible}
-        mealFilter={mealFilter}
-        period={period}
-        onChanged={load}
-      />
+      <EntryList entries={visible} mealFilter={mealFilter} period={period} onChanged={load} />
     </div>
   );
 }

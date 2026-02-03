@@ -416,7 +416,7 @@ export default function WeightTrackerPage({ userId }: Props) {
 
           <div className="card stack">
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <div style={{ fontWeight: 600 }}>⚖️ Trend 📈</div>
+              <div style={{ fontWeight: 600 }}>⏲️ Trend 📈</div>
               <div className="item-sub">
                 {metrics.length === 0 ? "No weights yet" : `Last ${trendDays} days`}
               </div>
@@ -446,7 +446,7 @@ export default function WeightTrackerPage({ userId }: Props) {
 
           {(overallStats.avgSteps != null || overallStats.avgCalories != null) && (
             <div className="card stack">
-              <div style={{ fontWeight: 600 }}>🧮 Averages</div>
+              <div style={{ fontWeight: 600 }}>🔢 Averages</div>
               <div className="row" style={{ gap: "16px", flexWrap: "wrap" }}>
                 {overallStats.avgSteps != null && (
                   <div

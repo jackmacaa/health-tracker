@@ -139,7 +139,7 @@ export default function LeaderboardPage({ userId }: Props) {
   return (
     <div className="stack">
       <div className="card stack">
-        <div style={{ fontWeight: 600 }}>Challenge Leaderboard</div>
+        <div style={{ fontWeight: 600 }}>🎯 Challenge Leaderboard 🏆</div>
         {challenge ? (
           <div className="item-sub">
             {challenge.name} · {DateTime.fromISO(challenge.start_at).toFormat("MMM d")} –{" "}
