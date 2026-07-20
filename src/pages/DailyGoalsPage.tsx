@@ -101,6 +101,21 @@ export default function DailyGoalsPage({ userId }: Props) {
 
   const isDayLocked = rewardAttempt != null;
 
+  const activeTemplates = useMemo(() => {
+    const active = templates.filter((template) => template.active);
+
+    return [...active].sort((a, b) => {
+      const aDone = isTemplateCompleted(a, progressByTemplateId, itemProgressByItemId);
+      const bDone = isTemplateCompleted(b, progressByTemplateId, itemProgressByItemId);
+
+      if (aDone !== bDone) {
+        return Number(aDone) - Number(bDone);
+      }
+
+      return a.title.localeCompare(b.title);
+    });
+  }, [templates, progressByTemplateId, itemProgressByItemId]);
+
   async function saveCheckboxTemplate(templateId: string, checked: boolean) {
     if (isDayLocked) return;
     setSaving(true);
@@ -243,8 +258,6 @@ export default function DailyGoalsPage({ userId }: Props) {
     }
   }
 
-  const activeTemplates = templates.filter((template) => template.active);
-
   return (
     <div className="stack">
       <div className="card stack">
@@ -287,7 +300,7 @@ export default function DailyGoalsPage({ userId }: Props) {
                   <div style={{ fontWeight: 700 }}>{template.title}</div>
                   <div className="item-sub">
                     {template.goal_kind === "number"
-                      ? `Target: ${template.target_value}`
+                      ? `Value: ${progress?.numeric_value ?? 0} / Target: ${template.target_value}`
                       : template.items.length > 0
                         ? `Checklist: ${template.items.length} items`
                         : "Single checkbox"}
