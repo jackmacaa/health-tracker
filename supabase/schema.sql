@@ -299,6 +299,8 @@ create table if not exists public.goal_reward_attempts (
   reward_label text not null,
   rolled_value numeric(6,3) not null,
   did_win boolean not null,
+  redeemed_at timestamptz,
+  redeemed_note text,
   created_at timestamptz not null default now(),
   constraint reward_attempt_tz_offset_range check (tz_offset_minutes between -840 and 840),
   constraint reward_attempt_counts_valid check (
@@ -312,6 +314,9 @@ create table if not exists public.goal_reward_attempts (
   constraint reward_attempt_chance_range check (chance_percent >= 0 and chance_percent <= 100),
   constraint reward_attempt_roll_range check (rolled_value >= 0 and rolled_value <= 100),
   constraint reward_attempt_label_length check (char_length(trim(reward_label)) between 1 and 120),
+  constraint reward_attempt_note_length check (
+    redeemed_note is null or (char_length(trim(redeemed_note)) between 1 and 240)
+  ),
   unique (user_id, local_date)
 );
 
@@ -372,6 +377,9 @@ create index if not exists idx_goal_daily_item_progress_user_date
   on public.goal_daily_item_progress (user_id, local_date desc);
 create index if not exists idx_goal_reward_attempts_user_date
   on public.goal_reward_attempts (user_id, local_date desc);
+create index if not exists idx_goal_reward_attempts_user_unredeemed
+  on public.goal_reward_attempts (user_id, occurred_at asc)
+  where did_win = true and redeemed_at is null;
 
 alter table public.goal_templates enable row level security;
 alter table public.goal_template_items enable row level security;

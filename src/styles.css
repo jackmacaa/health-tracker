@@ -410,6 +410,25 @@ textarea {
   color: #991b1b;
 }
 
+.goal-reward-status {
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+}
+
+.goal-reward-status.available {
+  background: #e9fbe8;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.goal-reward-status.used {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
 @media (min-width: 640px) {
   .container {
     padding: 24px;

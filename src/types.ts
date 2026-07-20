@@ -124,5 +124,7 @@ export interface GoalRewardAttempt {
   reward_label: string;
   rolled_value: number;
   did_win: boolean;
+  redeemed_at: string | null;
+  redeemed_note: string | null;
   created_at: string;
 }

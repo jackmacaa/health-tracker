@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
-import { listGoalRewardAttemptsRange } from "../api/goalRewards";
+import {
+  countUnredeemedGoalRewards,
+  listGoalRewardAttemptsRange,
+  redeemGoalRewardsQuantity,
+} from "../api/goalRewards";
 import {
   listGoalDailyItemProgressRange,
   listGoalDailyProgressRange,
@@ -20,7 +24,11 @@ interface Props {
 
 export default function GoalsHistoryPage({ userId }: Props) {
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [redeemQuantity, setRedeemQuantity] = useState("1");
+  const [availableRewards, setAvailableRewards] = useState(0);
 
   const [templates, setTemplates] = useState<
     Awaited<ReturnType<typeof listGoalTemplatesWithItems>>
@@ -42,8 +50,10 @@ export default function GoalsHistoryPage({ userId }: Props) {
   async function load() {
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
-      const [templateData, progressData, itemProgressData, rewardData] = await Promise.all([
+      const [templateData, progressData, itemProgressData, rewardData, availableCount] =
+        await Promise.all([
         listGoalTemplatesWithItems(userId),
         listGoalDailyProgressRange({
           user_id: userId,
@@ -60,11 +70,13 @@ export default function GoalsHistoryPage({ userId }: Props) {
           start_local_date: startDate,
           end_local_date: endDate,
         }),
-      ]);
+        countUnredeemedGoalRewards(userId),
+        ]);
       setTemplates(templateData);
       setProgressRows(progressData);
       setItemProgressRows(itemProgressData);
       setAttemptRows(rewardData);
+      setAvailableRewards(availableCount);
     } catch (e: any) {
       setError(e.message ?? String(e));
     } finally {
@@ -101,8 +113,69 @@ export default function GoalsHistoryPage({ userId }: Props) {
 
   const activeTemplates = templates.filter((template) => template.active);
 
+  const totalWins = attemptRows.filter((attempt) => attempt.did_win).length;
+  const canRedeem = (() => {
+    const parsed = Number(redeemQuantity);
+    return Number.isInteger(parsed) && parsed > 0 && parsed <= availableRewards;
+  })();
+
+  async function redeemRewards() {
+    const quantity = Number(redeemQuantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      setError("Enter a valid whole number to redeem.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const redeemed = await redeemGoalRewardsQuantity({
+        user_id: userId,
+        quantity,
+      });
+      setSuccess(`Redeemed ${redeemed} reward${redeemed === 1 ? "" : "s"}.`);
+      setRedeemQuantity("1");
+      await load();
+    } catch (e: any) {
+      setError(e.message ?? String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="stack">
+      <div className="card stack">
+        <div style={{ fontWeight: 700 }}>Rewards Wallet</div>
+        <div className="goal-summary-row">
+          <div className="goal-pill goal-pill-success">Available: {availableRewards}</div>
+          <div className="goal-pill">Wins in last 7 days: {totalWins}</div>
+        </div>
+        <div className="row" style={{ gap: "8px" }}>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={redeemQuantity}
+            onChange={(e) => setRedeemQuantity(e.target.value)}
+            placeholder="How many to redeem"
+            disabled={saving}
+          />
+          <button
+            className="btn secondary"
+            type="button"
+            disabled={saving || !canRedeem}
+            onClick={redeemRewards}
+          >
+            Redeem
+          </button>
+        </div>
+        <div className="item-sub">
+          Redeem from your total balance at any time. Rewards are consumed oldest-first.
+        </div>
+      </div>
+
       <div className="card stack">
         <div style={{ fontWeight: 700 }}>Last 7 Days</div>
         <div className="item-sub">
@@ -170,6 +243,11 @@ export default function GoalsHistoryPage({ userId }: Props) {
       {error && (
         <div className="card" style={{ color: "#dc2626" }}>
           {error}
+        </div>
+      )}
+      {success && (
+        <div className="card" style={{ color: "#16a34a" }}>
+          {success}
         </div>
       )}
     </div>
