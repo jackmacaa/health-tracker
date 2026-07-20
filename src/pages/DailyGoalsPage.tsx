@@ -135,11 +135,9 @@ export default function DailyGoalsPage({ userId }: Props) {
 
   async function saveNumberTemplate(templateId: string, value: number | null) {
     if (isDayLocked) return;
-    setSaving(true);
     setError(null);
-    setSuccess(null);
     try {
-      await upsertGoalDailyProgress({
+      const saved = await upsertGoalDailyProgress({
         user_id: userId,
         template_id: templateId,
         occurred_at: occurredAtNoonUtc(localDate),
@@ -147,12 +145,16 @@ export default function DailyGoalsPage({ userId }: Props) {
         checked: false,
         numeric_value: value,
       });
-      setSuccess("Saved.");
-      await load();
+
+      setProgressRows((current) => {
+        const index = current.findIndex((row) => row.template_id === templateId);
+        if (index < 0) return [...current, saved];
+        const next = [...current];
+        next[index] = saved;
+        return next;
+      });
     } catch (e: any) {
       setError(e.message ?? String(e));
-    } finally {
-      setSaving(false);
     }
   }
 
