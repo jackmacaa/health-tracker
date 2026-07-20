@@ -6,6 +6,9 @@ import Filters from "./components/Filters";
 import EntryList from "./components/EntryList";
 import WeightTrackerPage from "./pages/WeightTrackerPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
+import DailyGoalsPage from "./pages/DailyGoalsPage";
+import GoalsSetupPage from "./pages/GoalsSetupPage";
+import GoalsHistoryPage from "./pages/GoalsHistoryPage";
 import type { Entry, FilterKind, MealType } from "./types";
 import { isInPeriodByRowOffset, toLocalDateTime, widenedUtcFetchBounds } from "./lib/date";
 import { createEntry, listEntriesInRange } from "./api/entries";
@@ -54,6 +57,21 @@ function AuthedApp({ userId }: { userId: string }) {
           </h1>
           <div className="row" style={{ gap: "8px" }}>
             <NavLink className={({ isActive }) => `tab${isActive ? " active" : ""}`} to="/" end>
+              ✅
+            </NavLink>
+            <NavLink
+              className={({ isActive }) => `tab${isActive ? " active" : ""}`}
+              to="/goals/setup"
+            >
+              ⚙️
+            </NavLink>
+            <NavLink
+              className={({ isActive }) => `tab${isActive ? " active" : ""}`}
+              to="/goals/history"
+            >
+              📅
+            </NavLink>
+            <NavLink className={({ isActive }) => `tab${isActive ? " active" : ""}`} to="/food">
               🍽️
             </NavLink>
             <NavLink className={({ isActive }) => `tab${isActive ? " active" : ""}`} to="/weight">
@@ -73,13 +91,16 @@ function AuthedApp({ userId }: { userId: string }) {
       </header>
       <main className="container stack">
         <Routes>
-          <Route path="/" element={<FoodTrackerPage />} />
+          <Route path="/" element={<DailyGoalsPage userId={userId} />} />
+          <Route path="/goals/setup" element={<GoalsSetupPage userId={userId} />} />
+          <Route path="/goals/history" element={<GoalsHistoryPage userId={userId} />} />
+          <Route path="/food" element={<FoodTrackerPage />} />
           <Route path="/weight" element={<WeightTrackerPage userId={userId} />} />
           <Route path="/leaderboard" element={<LeaderboardPage userId={userId} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      {location.pathname === "/" && (
+      {location.pathname === "/food" && (
         <button className="fab" onClick={() => document.querySelector("textarea")?.focus()}>
           + Add
         </button>

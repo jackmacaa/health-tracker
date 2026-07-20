@@ -274,6 +274,142 @@ textarea {
   line-height: 1;
 }
 
+/* Goals pages */
+.goal-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.goal-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+  background: #fff;
+}
+
+.goal-pill-success {
+  background: #e9fbe8;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.goal-pill-fail {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.goal-status-ok,
+.goal-status-bad {
+  min-width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.goal-status-ok {
+  background: #e9fbe8;
+}
+
+.goal-status-bad {
+  background: #fef2f2;
+}
+
+.goal-attempt-box {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.goal-history-summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.goal-wheel-wrap {
+  width: 180px;
+  height: 180px;
+  margin: 4px auto 8px;
+  position: relative;
+}
+
+.goal-wheel {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 6px solid #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  background: conic-gradient(#16a34a 0deg 180deg, #ef4444 180deg 360deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 4.2s cubic-bezier(0.12, 0.78, 0.15, 1);
+}
+
+.goal-wheel.is-spinning {
+  filter: saturate(1.05);
+}
+
+.goal-wheel-center {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 2px solid #d1e7dd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #1a3d2e;
+}
+
+.goal-wheel-pointer {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 18px solid #1a3d2e;
+  z-index: 2;
+}
+
+.goal-wheel-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.goal-wheel-legend-win,
+.goal-wheel-legend-miss {
+  border-radius: 999px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+}
+
+.goal-wheel-legend-win {
+  background: #e9fbe8;
+  color: #166534;
+}
+
+.goal-wheel-legend-miss {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
 @media (min-width: 640px) {
   .container {
     padding: 24px;
