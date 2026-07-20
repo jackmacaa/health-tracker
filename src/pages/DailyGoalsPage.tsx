@@ -98,6 +98,7 @@ export default function DailyGoalsPage({ userId }: Props) {
 
   const chancePercent = Math.max(0, Math.min(100, rewardSettings?.chance_percent ?? 0));
   const chanceDegrees = chancePercent * 3.6;
+  const allGoalsCompleted = summary.total > 0 && summary.done;
 
   const isDayLocked = rewardAttempt != null;
 
@@ -258,8 +259,66 @@ export default function DailyGoalsPage({ userId }: Props) {
     }
   }
 
+  const rewardCard = (
+    <div className="card stack">
+      <div style={{ fontWeight: 700 }}>Reward Spin</div>
+      <div className="goal-wheel-wrap">
+        <div className="goal-wheel-pointer" />
+        <div
+          className={`goal-wheel ${wheelSpinning ? "is-spinning" : ""}`}
+          style={{
+            transform: `rotate(${wheelRotation}deg)`,
+            background: `conic-gradient(#16a34a 0deg ${chanceDegrees}deg, #ef4444 ${chanceDegrees}deg 360deg)`,
+          }}
+        >
+          <span className="goal-wheel-center">SPIN</span>
+        </div>
+      </div>
+      {!rewardSettings && (
+        <div className="item-sub">Set up a reward in Goals Setup to enable spinning.</div>
+      )}
+      {rewardSettings && (
+        <>
+          <div className="item-sub">
+            Reward: {rewardSettings.reward_label} · Chance: {rewardSettings.chance_percent}%
+          </div>
+          <div className="goal-wheel-legend">
+            <span className="goal-wheel-legend-win">Win zone: {chancePercent.toFixed(1)}%</span>
+            <span className="goal-wheel-legend-miss">
+              Miss zone: {(100 - chancePercent).toFixed(1)}%
+            </span>
+          </div>
+          <div className="item-sub">
+            Unlock rule: {rewardSettings.threshold_mode === "count" ? "count" : "percent"} ≥{" "}
+            {rewardSettings.threshold_value}
+          </div>
+          {rewardAttempt ? (
+            <div className="goal-attempt-box">
+              Spin already used today: {rewardAttempt.did_win ? "WIN" : "MISS"}
+            </div>
+          ) : (
+            <button
+              className="btn"
+              type="button"
+              disabled={!eligibleForReward || saving || isDayLocked}
+              onClick={spinReward}
+            >
+              {wheelSpinning
+                ? "Spinning..."
+                : eligibleForReward
+                  ? "Spin reward"
+                  : "Complete more goals to unlock spin"}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="stack">
+      {allGoalsCompleted && rewardCard}
+
       <div className="card stack">
         <div style={{ fontWeight: 700 }}>Daily Goals</div>
         <div className="item-sub">{DateTime.fromISO(localDate).toFormat("cccc, LLL d")}</div>
@@ -387,59 +446,7 @@ export default function DailyGoalsPage({ userId }: Props) {
           );
         })}
 
-      <div className="card stack">
-        <div style={{ fontWeight: 700 }}>Reward Spin</div>
-        <div className="goal-wheel-wrap">
-          <div className="goal-wheel-pointer" />
-          <div
-            className={`goal-wheel ${wheelSpinning ? "is-spinning" : ""}`}
-            style={{
-              transform: `rotate(${wheelRotation}deg)`,
-              background: `conic-gradient(#16a34a 0deg ${chanceDegrees}deg, #ef4444 ${chanceDegrees}deg 360deg)`,
-            }}
-          >
-            <span className="goal-wheel-center">SPIN</span>
-          </div>
-        </div>
-        {!rewardSettings && (
-          <div className="item-sub">Set up a reward in Goals Setup to enable spinning.</div>
-        )}
-        {rewardSettings && (
-          <>
-            <div className="item-sub">
-              Reward: {rewardSettings.reward_label} · Chance: {rewardSettings.chance_percent}%
-            </div>
-            <div className="goal-wheel-legend">
-              <span className="goal-wheel-legend-win">Win zone: {chancePercent.toFixed(1)}%</span>
-              <span className="goal-wheel-legend-miss">
-                Miss zone: {(100 - chancePercent).toFixed(1)}%
-              </span>
-            </div>
-            <div className="item-sub">
-              Unlock rule: {rewardSettings.threshold_mode === "count" ? "count" : "percent"} ≥{" "}
-              {rewardSettings.threshold_value}
-            </div>
-            {rewardAttempt ? (
-              <div className="goal-attempt-box">
-                Spin already used today: {rewardAttempt.did_win ? "WIN" : "MISS"}
-              </div>
-            ) : (
-              <button
-                className="btn"
-                type="button"
-                disabled={!eligibleForReward || saving || isDayLocked}
-                onClick={spinReward}
-              >
-                {wheelSpinning
-                  ? "Spinning..."
-                  : eligibleForReward
-                    ? "Spin reward"
-                    : "Complete more goals to unlock spin"}
-              </button>
-            )}
-          </>
-        )}
-      </div>
+      {!allGoalsCompleted && rewardCard}
 
       {error && (
         <div className="card" style={{ color: "#dc2626" }}>
