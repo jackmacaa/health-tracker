@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DateTime } from "luxon";
 import {
   getGoalRewardSettings,
@@ -48,6 +48,8 @@ export default function DailyGoalsPage({ userId }: Props) {
   const [rewardAttempt, setRewardAttempt] = useState<GoalRewardAttempt | null>(null);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [numberDrafts, setNumberDrafts] = useState<Record<string, string>>({});
+  const numberSaveTimersRef = useRef<Record<string, number>>({});
 
   const localDate = toLocalDateISO(DateTime.local());
 
@@ -77,6 +79,15 @@ export default function DailyGoalsPage({ userId }: Props) {
   useEffect(() => {
     load();
   }, [userId]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(numberSaveTimersRef.current).forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+      numberSaveTimersRef.current = {};
+    };
+  }, []);
 
   const progressByTemplateId = useMemo(() => keyByTemplateId(progressRows), [progressRows]);
   const itemProgressByItemId = useMemo(
@@ -143,6 +154,30 @@ export default function DailyGoalsPage({ userId }: Props) {
     } finally {
       setSaving(false);
     }
+  }
+
+  function queueSaveNumberTemplate(templateId: string, nextValue: string) {
+    const existingTimer = numberSaveTimersRef.current[templateId];
+    if (existingTimer != null) {
+      window.clearTimeout(existingTimer);
+    }
+
+    const timerId = window.setTimeout(() => {
+      const parsed = nextValue === "" ? null : Number(nextValue);
+      if (parsed != null && (Number.isNaN(parsed) || parsed < 0)) return;
+
+      void saveNumberTemplate(templateId, parsed == null ? null : Math.floor(parsed));
+
+      setNumberDrafts((current) => {
+        if (current[templateId] !== nextValue) return current;
+        const { [templateId]: _, ...rest } = current;
+        return rest;
+      });
+
+      delete numberSaveTimersRef.current[templateId];
+    }, 450);
+
+    numberSaveTimersRef.current[templateId] = timerId;
   }
 
   async function toggleChecklistItem(templateId: string, itemId: string, checked: boolean) {
@@ -291,17 +326,14 @@ export default function DailyGoalsPage({ userId }: Props) {
                     type="number"
                     min="0"
                     step="1"
-                    value={progress?.numeric_value ?? ""}
+                    value={numberDrafts[template.id] ?? String(progress?.numeric_value ?? "")}
                     placeholder="0"
                     disabled={saving || isDayLocked}
                     onChange={(e) => {
                       const next = e.target.value;
-                      const parsed = next === "" ? null : Number(next);
-                      if (parsed != null && (Number.isNaN(parsed) || parsed < 0)) return;
-                      void saveNumberTemplate(
-                        template.id,
-                        parsed == null ? null : Math.floor(parsed),
-                      );
+                      if (next !== "" && !/^\d+$/.test(next)) return;
+                      setNumberDrafts((current) => ({ ...current, [template.id]: next }));
+                      queueSaveNumberTemplate(template.id, next);
                     }}
                   />
                 </div>
