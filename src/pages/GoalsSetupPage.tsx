@@ -307,7 +307,9 @@ export default function GoalsSetupPage({ userId }: Props) {
   }
 
   async function removeGoal(template: GoalTemplate) {
-    const ok = confirm("Delete this goal template? This will remove past progress for that goal.");
+    const ok = confirm(
+      `Are you sure you want to delete "${template.title}"? This will permanently remove this goal and its past progress.`,
+    );
     if (!ok) return;
     setSaving(true);
     setError(null);
