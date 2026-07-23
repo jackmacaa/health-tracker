@@ -396,8 +396,23 @@ textarea {
   align-items: center;
   justify-content: center;
   font-size: 12px;
+  letter-spacing: 0.08em;
   font-weight: 800;
   color: #1a3d2e;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    opacity 120ms ease;
+}
+
+.goal-wheel-center:hover:not(:disabled) {
+  transform: scale(1.04);
+  box-shadow: 0 3px 12px rgba(17, 24, 39, 0.2);
+}
+
+.goal-wheel-center:disabled {
+  cursor: not-allowed;
 }
 
 .goal-wheel-pointer {

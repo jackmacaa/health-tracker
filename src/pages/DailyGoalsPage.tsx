@@ -1,6 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DateTime } from "luxon";
-import { getGoalRewardSettings, getGoalRewardAttemptByDate } from "../api/goalRewards";
+import {
+  getGoalRewardSettings,
+  getGoalRewardAttemptByDate,
+  spinGoalRewardForToday,
+} from "../api/goalRewards";
 import {
   listGoalDailyItemProgressByDate,
   listGoalDailyProgressByDate,
@@ -9,6 +13,7 @@ import {
   upsertGoalDailyProgress,
 } from "../api/goals";
 import { tzOffsetNowMinutes } from "../lib/date";
+import { playWheelSound, startWheelTickTrack } from "../lib/wheelFx";
 import type { GoalRewardAttempt } from "../types";
 import {
   occurredAtNoonUtc,
@@ -85,6 +90,29 @@ function buildWheelGradient(sectors: WheelSector[]) {
     .join(", ")})`;
 }
 
+function pickLandingAngle(params: {
+  sectors: WheelSector[];
+  didWin: boolean;
+  rolledPercent: number;
+}) {
+  const matchingSectors = params.sectors.filter((sector) => sector.win === params.didWin);
+  if (matchingSectors.length === 0) {
+    return Math.max(0, Math.min(99.999, params.rolledPercent)) * 3.6;
+  }
+
+  const picked = matchingSectors[Math.floor(Math.random() * matchingSectors.length)];
+  const span = Math.max(0.4, picked.endDeg - picked.startDeg);
+  const margin = Math.min(0.2, span / 4);
+  const minDeg = picked.startDeg + margin;
+  const maxDeg = picked.endDeg - margin;
+
+  if (maxDeg <= minDeg) {
+    return (picked.startDeg + picked.endDeg) / 2;
+  }
+
+  return minDeg + Math.random() * (maxDeg - minDeg);
+}
+
 export default function DailyGoalsPage({ userId }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -104,6 +132,10 @@ export default function DailyGoalsPage({ userId }: Props) {
     useState<Awaited<ReturnType<typeof getGoalRewardSettings>>>(null);
   const [rewardAttempt, setRewardAttempt] = useState<GoalRewardAttempt | null>(null);
   const [numberDrafts, setNumberDrafts] = useState<Record<string, string>>({});
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [wheelSpinning, setWheelSpinning] = useState(false);
+  const spinTickStopRef = useRef<(() => void) | null>(null);
+  const spinEndTimeoutRef = useRef<number | null>(null);
 
   const localDate = toLocalDateISO(DateTime.local());
 
@@ -161,21 +193,103 @@ export default function DailyGoalsPage({ userId }: Props) {
   const allGoalsCompleted = summary.total > 0 && summary.done;
 
   const isChecklistLocked = rewardAttempt != null;
+  const canSpinToday = Boolean(rewardSettings) && eligibleForReward && !rewardAttempt;
 
   const activeTemplates = useMemo(() => {
     const active = templates.filter((template) => template.active);
 
     return [...active].sort((a, b) => {
-      const aDone = isTemplateCompleted(a, progressByTemplateId, itemProgressByItemId);
-      const bDone = isTemplateCompleted(b, progressByTemplateId, itemProgressByItemId);
-
-      if (aDone !== bDone) {
-        return Number(aDone) - Number(bDone);
+      if (a.display_order !== b.display_order) {
+        return a.display_order - b.display_order;
       }
 
       return a.title.localeCompare(b.title);
     });
-  }, [templates, progressByTemplateId, itemProgressByItemId]);
+  }, [templates]);
+
+  useEffect(() => {
+    return () => {
+      spinTickStopRef.current?.();
+      if (spinEndTimeoutRef.current != null) {
+        window.clearTimeout(spinEndTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  async function spinTodayReward() {
+    if (!rewardSettings) {
+      setError("Set up a reward in Goals Setup first.");
+      return;
+    }
+    if (rewardAttempt) {
+      setError("Reward spin already used for this day.");
+      return;
+    }
+    if (!eligibleForReward) {
+      setError("Complete more goals to unlock today's spin.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    let didCreateAttempt = false;
+    let didWinResult = false;
+    try {
+      const attempt = await spinGoalRewardForToday({
+        user_id: userId,
+        local_date: localDate,
+        tz_offset_minutes: tzOffsetNowMinutes(),
+        settings: rewardSettings,
+        eligible_goal_count: summary.completed,
+        total_goal_count: summary.total,
+      });
+      didCreateAttempt = true;
+      didWinResult = attempt.did_win;
+
+      const desiredPointerAngle = pickLandingAngle({
+        sectors: wheelSectors,
+        didWin: attempt.did_win,
+        rolledPercent: attempt.rolled_value,
+      });
+
+      setWheelSpinning(true);
+      playWheelSound("start", true);
+      spinTickStopRef.current?.();
+      spinTickStopRef.current = startWheelTickTrack(4000, true);
+      setWheelRotation((prev) => {
+        const currentNormalized = ((prev % 360) + 360) % 360;
+        const finalNormalized = (360 - desiredPointerAngle) % 360;
+        const deltaNormalized = (finalNormalized - currentNormalized + 360) % 360;
+        const spinDegrees = 3600 + deltaNormalized;
+        return prev + spinDegrees;
+      });
+
+      setSuccess(
+        attempt.did_win ? `Today's spin: WIN (${attempt.reward_label})` : "Today's spin: MISS",
+      );
+      await load();
+    } catch (e: any) {
+      setError(e.message ?? String(e));
+    } finally {
+      if (!didCreateAttempt) {
+        spinTickStopRef.current?.();
+        setWheelSpinning(false);
+        setSaving(false);
+        return;
+      }
+
+      if (spinEndTimeoutRef.current != null) {
+        window.clearTimeout(spinEndTimeoutRef.current);
+      }
+      spinEndTimeoutRef.current = window.setTimeout(() => {
+        setWheelSpinning(false);
+        spinTickStopRef.current?.();
+        playWheelSound(didWinResult ? "win" : "miss", true);
+      }, 4200);
+      setSaving(false);
+    }
+  }
 
   async function saveCheckboxTemplate(templateId: string, checked: boolean) {
     if (isChecklistLocked) return;
@@ -282,12 +396,20 @@ export default function DailyGoalsPage({ userId }: Props) {
       <div className="goal-wheel-wrap">
         <div className="goal-wheel-pointer" />
         <div
-          className="goal-wheel"
+          className={`goal-wheel ${wheelSpinning ? "is-spinning" : ""}`}
           style={{
+            transform: `rotate(${wheelRotation}deg)`,
             background: wheelGradient,
           }}
         >
-          <span className="goal-wheel-center">SPIN</span>
+          <button
+            className="goal-wheel-center"
+            type="button"
+            disabled={saving || wheelSpinning || !canSpinToday}
+            onClick={spinTodayReward}
+          >
+            {wheelSpinning ? "..." : "SPIN"}
+          </button>
         </div>
       </div>
       {!rewardSettings && (
@@ -316,8 +438,8 @@ export default function DailyGoalsPage({ userId }: Props) {
           ) : (
             <div className="goal-attempt-box">
               {eligibleForReward
-                ? "Today qualifies for a spin token if you leave it unspun. Use spin tokens in Goals History."
-                : "Complete more goals to unlock a spin token for today."}
+                ? "Today's spin is unlocked. Press the wheel center to spin now."
+                : "Complete more goals to unlock today's spin."}
             </div>
           )}
         </>

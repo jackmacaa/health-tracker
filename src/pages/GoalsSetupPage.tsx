@@ -227,7 +227,10 @@ export default function GoalsSetupPage({ userId }: Props) {
         if (previewBurstTimeoutRef.current != null) {
           window.clearTimeout(previewBurstTimeoutRef.current);
         }
-        previewBurstTimeoutRef.current = window.setTimeout(() => setPreviewWinBurstActive(false), 1100);
+        previewBurstTimeoutRef.current = window.setTimeout(
+          () => setPreviewWinBurstActive(false),
+          1100,
+        );
       } else {
         setPreviewWinBurstActive(false);
       }
@@ -597,7 +600,14 @@ export default function GoalsSetupPage({ userId }: Props) {
               background: previewWheelGradient,
             }}
           >
-            <span className="goal-wheel-center">TEST</span>
+            <button
+              className="goal-wheel-center"
+              type="button"
+              disabled={previewWheelSpinning}
+              onClick={spinPreviewWheel}
+            >
+              {previewWheelSpinning ? "..." : "SPIN"}
+            </button>
           </div>
           {previewWinBurstActive && (
             <>
@@ -611,7 +621,9 @@ export default function GoalsSetupPage({ userId }: Props) {
           )}
         </div>
         <div className="goal-wheel-legend">
-          <span className="goal-wheel-legend-win">Win zone: {previewChancePercent.toFixed(1)}%</span>
+          <span className="goal-wheel-legend-win">
+            Win zone: {previewChancePercent.toFixed(1)}%
+          </span>
           <span className="goal-wheel-legend-miss">
             Miss zone: {(100 - previewChancePercent).toFixed(1)}%
           </span>
@@ -624,14 +636,6 @@ export default function GoalsSetupPage({ userId }: Props) {
             Sound: {previewSoundOn ? "On" : "Off"}
           </button>
         </div>
-        <button
-          className="btn secondary"
-          type="button"
-          disabled={previewWheelSpinning}
-          onClick={spinPreviewWheel}
-        >
-          {previewWheelSpinning ? "Spinning preview..." : "Spin preview"}
-        </button>
         {previewResult && <div className="goal-attempt-box">{previewResult}</div>}
       </div>
 
@@ -728,8 +732,10 @@ export default function GoalsSetupPage({ userId }: Props) {
                   type="button"
                   onClick={() => beginEdit(template)}
                   disabled={saving}
+                  title="Edit goal"
+                  aria-label="Edit goal"
                 >
-                  {editingTemplateId === template.id ? "Editing" : "Edit"}
+                  ✏️
                 </button>
                 <button
                   className="btn secondary"
@@ -754,16 +760,20 @@ export default function GoalsSetupPage({ userId }: Props) {
                   type="button"
                   onClick={() => toggleGoalActive(template)}
                   disabled={saving}
+                  title={template.active ? "Archive goal" : "Activate goal"}
+                  aria-label={template.active ? "Archive goal" : "Activate goal"}
                 >
-                  {template.active ? "Archive" : "Activate"}
+                  {template.active ? "🙈" : "👁️"}
                 </button>
                 <button
                   className="btn danger"
                   type="button"
                   onClick={() => removeGoal(template)}
                   disabled={saving}
+                  title="Delete goal"
+                  aria-label="Delete goal"
                 >
-                  Delete
+                  🗑️
                 </button>
               </div>
             </div>

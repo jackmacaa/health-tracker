@@ -437,7 +437,14 @@ export default function GoalsHistoryPage({ userId }: Props) {
               background: wheelGradient,
             }}
           >
-            <span className="goal-wheel-center">TOKEN</span>
+            <button
+              className="goal-wheel-center"
+              type="button"
+              disabled={saving || wheelSpinning || !rewardSettings || !oldestBankedSpinDate}
+              onClick={spinBankedToken}
+            >
+              {wheelSpinning ? "..." : "SPIN"}
+            </button>
           </div>
           {winBurstActive && (
             <>
@@ -469,14 +476,6 @@ export default function GoalsHistoryPage({ userId }: Props) {
             ? `Next token to spin: ${DateTime.fromISO(oldestBankedSpinDate).toFormat("cccc, LLL d")}`
             : "No banked spin tokens right now."}
         </div>
-        <button
-          className="btn"
-          type="button"
-          disabled={saving || wheelSpinning || !rewardSettings || !oldestBankedSpinDate}
-          onClick={spinBankedToken}
-        >
-          {wheelSpinning ? "Spinning token..." : "Spin oldest token"}
-        </button>
       </div>
 
       <div className="card stack">
