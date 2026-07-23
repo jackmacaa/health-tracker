@@ -60,6 +60,7 @@ export interface GoalTemplate {
   title: string;
   goal_kind: GoalKind;
   target_value: number | null;
+  default_checked: boolean;
   active: boolean;
   display_order: number;
   created_at: string;
@@ -70,6 +71,7 @@ export interface GoalTemplateItem {
   id: string;
   template_id: string;
   label: string;
+  default_checked: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -104,6 +106,7 @@ export interface GoalRewardSettings {
   user_id: string;
   reward_label: string;
   chance_percent: number;
+  wheel_segment_count: number;
   threshold_mode: RewardThresholdMode;
   threshold_value: number;
   created_at: string;

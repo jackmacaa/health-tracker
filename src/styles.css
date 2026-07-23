@@ -335,6 +335,32 @@ textarea {
   justify-content: space-between;
 }
 
+.goal-number-row {
+  align-items: center;
+}
+
+.goal-number-row input {
+  min-width: 88px;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .goal-number-row {
+    display: grid;
+    grid-template-columns: 52px 1fr 52px 80px;
+  }
+
+  .goal-number-row input {
+    width: 100%;
+  }
+
+  .goal-number-row .btn {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
 .goal-wheel-wrap {
   width: 180px;
   height: 180px;

@@ -16,6 +16,7 @@ export async function upsertGoalRewardSettings(input: {
   user_id: string;
   reward_label: string;
   chance_percent: number;
+  wheel_segment_count: number;
   threshold_mode: "count" | "percent";
   threshold_value: number;
 }): Promise<GoalRewardSettings> {

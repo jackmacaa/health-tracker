@@ -50,10 +50,12 @@ export function isTemplateCompleted(
   }
 
   if (template.items.length === 0) {
-    return progress?.checked ?? false;
+    return progress?.checked ?? template.default_checked;
   }
 
-  return template.items.every((item) => itemProgressByItemId[item.id]?.checked ?? false);
+  return template.items.every(
+    (item) => itemProgressByItemId[item.id]?.checked ?? item.default_checked,
+  );
 }
 
 export function summarizeDay(

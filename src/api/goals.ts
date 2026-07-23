@@ -56,6 +56,7 @@ export async function createGoalTemplate(input: {
   title: string;
   goal_kind: GoalKind;
   target_value: number | null;
+  default_checked?: boolean;
   active?: boolean;
   display_order?: number;
 }): Promise<GoalTemplate> {
@@ -79,6 +80,7 @@ export async function updateGoalTemplate(
     title: string;
     goal_kind: GoalKind;
     target_value: number | null;
+    default_checked: boolean;
     active: boolean;
     display_order: number;
   }>,
@@ -104,11 +106,19 @@ export async function deleteGoalTemplate(id: string): Promise<void> {
 
 export async function replaceGoalTemplateItems(
   templateId: string,
-  labels: string[],
+  items: Array<string | { label: string; default_checked?: boolean }>,
 ): Promise<void> {
-  const cleanLabels = labels
-    .map((label) => label.trim())
-    .filter((label) => label.length > 0)
+  const cleanItems = items
+    .map((item) => {
+      if (typeof item === "string") {
+        return { label: item.trim(), default_checked: false };
+      }
+      return {
+        label: item.label.trim(),
+        default_checked: Boolean(item.default_checked),
+      };
+    })
+    .filter((item) => item.label.length > 0)
     .slice(0, 12);
 
   const { error: deleteError } = await supabase
@@ -117,11 +127,12 @@ export async function replaceGoalTemplateItems(
     .eq("template_id", templateId);
   if (deleteError) throw deleteError;
 
-  if (cleanLabels.length === 0) return;
+  if (cleanItems.length === 0) return;
 
-  const rows = cleanLabels.map((label, index) => ({
+  const rows = cleanItems.map((item, index) => ({
     template_id: templateId,
-    label,
+    label: item.label,
+    default_checked: item.default_checked,
     sort_order: index,
   }));
   const { error: insertError } = await supabase.from("goal_template_items").insert(rows);
