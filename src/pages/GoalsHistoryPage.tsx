@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DateTime } from "luxon";
 import {
   countUnredeemedGoalRewards,
@@ -13,6 +13,7 @@ import {
   listGoalTemplatesWithItems,
 } from "../api/goals";
 import { tzOffsetNowMinutes } from "../lib/date";
+import { playWheelSound, startWheelTickTrack } from "../lib/wheelFx";
 import {
   isRewardEligible,
   isTemplateCompleted,
@@ -121,6 +122,11 @@ export default function GoalsHistoryPage({ userId }: Props) {
     useState<Awaited<ReturnType<typeof getGoalRewardSettings>>>(null);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [wheelSoundOn, setWheelSoundOn] = useState(true);
+  const [winBurstActive, setWinBurstActive] = useState(false);
+  const spinTickStopRef = useRef<(() => void) | null>(null);
+  const spinEndTimeoutRef = useRef<number | null>(null);
+  const winBurstTimeoutRef = useRef<number | null>(null);
 
   const [templates, setTemplates] = useState<
     Awaited<ReturnType<typeof listGoalTemplatesWithItems>>
@@ -255,6 +261,18 @@ export default function GoalsHistoryPage({ userId }: Props) {
     return Number.isInteger(parsed) && parsed > 0 && parsed <= availableRewards;
   })();
 
+  useEffect(() => {
+    return () => {
+      spinTickStopRef.current?.();
+      if (spinEndTimeoutRef.current != null) {
+        window.clearTimeout(spinEndTimeoutRef.current);
+      }
+      if (winBurstTimeoutRef.current != null) {
+        window.clearTimeout(winBurstTimeoutRef.current);
+      }
+    };
+  }, []);
+
   async function spinBankedToken() {
     if (!rewardSettings) {
       setError("Configure reward settings first in Goals Setup.");
@@ -275,6 +293,8 @@ export default function GoalsHistoryPage({ userId }: Props) {
     setSaving(true);
     setError(null);
     setSuccess(null);
+    let didCreateAttempt = false;
+    let didWinResult = false;
     try {
       const attempt = await spinGoalRewardForToday({
         user_id: userId,
@@ -284,6 +304,8 @@ export default function GoalsHistoryPage({ userId }: Props) {
         eligible_goal_count: summary.completed,
         total_goal_count: summary.total,
       });
+      didCreateAttempt = true;
+      didWinResult = attempt.did_win;
 
       const desiredPointerAngle = pickLandingAngle({
         sectors: wheelSectors,
@@ -292,6 +314,9 @@ export default function GoalsHistoryPage({ userId }: Props) {
       });
 
       setWheelSpinning(true);
+      playWheelSound("start", wheelSoundOn);
+      spinTickStopRef.current?.();
+      spinTickStopRef.current = startWheelTickTrack(4000, wheelSoundOn);
       setWheelRotation((prev) => {
         const currentNormalized = ((prev % 360) + 360) % 360;
         const finalNormalized = (360 - desiredPointerAngle) % 360;
@@ -310,7 +335,32 @@ export default function GoalsHistoryPage({ userId }: Props) {
     } catch (e: any) {
       setError(e.message ?? String(e));
     } finally {
-      window.setTimeout(() => setWheelSpinning(false), 4200);
+      if (!didCreateAttempt) {
+        spinTickStopRef.current?.();
+        setWheelSpinning(false);
+        setWinBurstActive(false);
+        setSaving(false);
+        return;
+      }
+
+      if (spinEndTimeoutRef.current != null) {
+        window.clearTimeout(spinEndTimeoutRef.current);
+      }
+      spinEndTimeoutRef.current = window.setTimeout(() => {
+        setWheelSpinning(false);
+        spinTickStopRef.current?.();
+        playWheelSound(didWinResult ? "win" : "miss", wheelSoundOn);
+      }, 4200);
+
+      if (didWinResult) {
+        setWinBurstActive(true);
+        if (winBurstTimeoutRef.current != null) {
+          window.clearTimeout(winBurstTimeoutRef.current);
+        }
+        winBurstTimeoutRef.current = window.setTimeout(() => setWinBurstActive(false), 1100);
+      } else {
+        setWinBurstActive(false);
+      }
       setSaving(false);
     }
   }
@@ -378,8 +428,8 @@ export default function GoalsHistoryPage({ userId }: Props) {
         <div className="item-sub">
           Eligible days you did not spin are banked as tokens. Spin them here later.
         </div>
-        <div className="goal-wheel-wrap">
-          <div className="goal-wheel-pointer" />
+        <div className={`goal-wheel-wrap ${winBurstActive ? "is-win-burst" : ""}`}>
+          <div className={`goal-wheel-pointer ${wheelSpinning ? "is-ticking" : ""}`} />
           <div
             className={`goal-wheel ${wheelSpinning ? "is-spinning" : ""}`}
             style={{
@@ -389,6 +439,16 @@ export default function GoalsHistoryPage({ userId }: Props) {
           >
             <span className="goal-wheel-center">TOKEN</span>
           </div>
+          {winBurstActive && (
+            <>
+              <span className="goal-confetti goal-confetti-1" />
+              <span className="goal-confetti goal-confetti-2" />
+              <span className="goal-confetti goal-confetti-3" />
+              <span className="goal-confetti goal-confetti-4" />
+              <span className="goal-confetti goal-confetti-5" />
+              <span className="goal-confetti goal-confetti-6" />
+            </>
+          )}
         </div>
         <div className="goal-wheel-legend">
           <span className="goal-wheel-legend-win">Win zone: {chancePercent.toFixed(1)}%</span>
@@ -396,6 +456,13 @@ export default function GoalsHistoryPage({ userId }: Props) {
             Miss zone: {(100 - chancePercent).toFixed(1)}%
           </span>
           <span className="goal-wheel-legend-miss">Segments: {wheelSegmentCount}</span>
+          <button
+            className="btn secondary"
+            type="button"
+            onClick={() => setWheelSoundOn((value) => !value)}
+          >
+            Sound: {wheelSoundOn ? "On" : "Off"}
+          </button>
         </div>
         <div className="item-sub">
           {oldestBankedSpinDate

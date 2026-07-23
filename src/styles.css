@@ -366,6 +366,7 @@ textarea {
   height: 180px;
   margin: 4px auto 8px;
   position: relative;
+  overflow: visible;
 }
 
 .goal-wheel {
@@ -410,6 +411,119 @@ textarea {
   border-right: 10px solid transparent;
   border-top: 18px solid #1a3d2e;
   z-index: 2;
+}
+
+.goal-wheel-pointer.is-ticking {
+  animation: goal-pointer-tick 120ms ease-in-out infinite alternate;
+}
+
+.goal-wheel-wrap.is-win-burst .goal-wheel {
+  box-shadow:
+    0 0 0 6px rgba(34, 197, 94, 0.16),
+    0 0 0 16px rgba(34, 197, 94, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.goal-confetti {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  pointer-events: none;
+  animation: goal-confetti-pop 900ms ease-out forwards;
+}
+
+.goal-confetti-1 {
+  background: #22c55e;
+  animation-delay: 0ms;
+  transform: translate(-50%, -50%) rotate(6deg);
+}
+
+.goal-confetti-2 {
+  background: #f59e0b;
+  animation-delay: 40ms;
+  transform: translate(-50%, -50%) rotate(22deg);
+}
+
+.goal-confetti-3 {
+  background: #3b82f6;
+  animation-delay: 20ms;
+  transform: translate(-50%, -50%) rotate(-12deg);
+}
+
+.goal-confetti-4 {
+  background: #ef4444;
+  animation-delay: 70ms;
+  transform: translate(-50%, -50%) rotate(-28deg);
+}
+
+.goal-confetti-5 {
+  background: #06b6d4;
+  animation-delay: 30ms;
+  transform: translate(-50%, -50%) rotate(38deg);
+}
+
+.goal-confetti-6 {
+  background: #a855f7;
+  animation-delay: 80ms;
+  transform: translate(-50%, -50%) rotate(-40deg);
+}
+
+@keyframes goal-pointer-tick {
+  from {
+    transform: translateX(-50%) rotate(-5deg);
+  }
+  to {
+    transform: translateX(-50%) rotate(5deg);
+  }
+}
+
+@keyframes goal-confetti-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + (var(--dx, 0px))), calc(-50% + (var(--dy, 0px))))
+      rotate(220deg);
+  }
+}
+
+.goal-confetti-1 {
+  --dx: -48px;
+  --dy: -56px;
+}
+
+.goal-confetti-2 {
+  --dx: -20px;
+  --dy: -68px;
+}
+
+.goal-confetti-3 {
+  --dx: 18px;
+  --dy: -62px;
+}
+
+.goal-confetti-4 {
+  --dx: 50px;
+  --dy: -42px;
+}
+
+.goal-confetti-5 {
+  --dx: 34px;
+  --dy: -74px;
+}
+
+.goal-confetti-6 {
+  --dx: -42px;
+  --dy: -38px;
 }
 
 .goal-wheel-legend {

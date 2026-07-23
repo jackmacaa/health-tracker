@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createGoalTemplate,
   deleteGoalTemplate,
@@ -7,6 +7,7 @@ import {
   updateGoalTemplate,
 } from "../api/goals";
 import { getGoalRewardSettings, upsertGoalRewardSettings } from "../api/goalRewards";
+import { playWheelSound, startWheelTickTrack } from "../lib/wheelFx";
 import type { GoalTemplate, RewardThresholdMode } from "../types";
 
 interface Props {
@@ -121,6 +122,11 @@ export default function GoalsSetupPage({ userId }: Props) {
   const [previewWheelRotation, setPreviewWheelRotation] = useState(0);
   const [previewWheelSpinning, setPreviewWheelSpinning] = useState(false);
   const [previewResult, setPreviewResult] = useState<string | null>(null);
+  const [previewSoundOn, setPreviewSoundOn] = useState(true);
+  const [previewWinBurstActive, setPreviewWinBurstActive] = useState(false);
+  const previewTickStopRef = useRef<(() => void) | null>(null);
+  const previewEndTimeoutRef = useRef<number | null>(null);
+  const previewBurstTimeoutRef = useRef<number | null>(null);
 
   async function load() {
     setLoading(true);
@@ -176,6 +182,18 @@ export default function GoalsSetupPage({ userId }: Props) {
     [previewWheelSectors],
   );
 
+  useEffect(() => {
+    return () => {
+      previewTickStopRef.current?.();
+      if (previewEndTimeoutRef.current != null) {
+        window.clearTimeout(previewEndTimeoutRef.current);
+      }
+      if (previewBurstTimeoutRef.current != null) {
+        window.clearTimeout(previewBurstTimeoutRef.current);
+      }
+    };
+  }, []);
+
   function spinPreviewWheel() {
     const rolledValue = Number((Math.random() * 100).toFixed(3));
     const didWin = rolledValue < previewChancePercent;
@@ -183,6 +201,9 @@ export default function GoalsSetupPage({ userId }: Props) {
 
     setPreviewResult(null);
     setPreviewWheelSpinning(true);
+    playWheelSound("start", previewSoundOn);
+    previewTickStopRef.current?.();
+    previewTickStopRef.current = startWheelTickTrack(4000, previewSoundOn);
     setPreviewWheelRotation((prev) => {
       const currentNormalized = ((prev % 360) + 360) % 360;
       const finalNormalized = (360 - desiredPointerAngle) % 360;
@@ -191,11 +212,25 @@ export default function GoalsSetupPage({ userId }: Props) {
       return prev + spinDegrees;
     });
 
-    window.setTimeout(() => {
+    if (previewEndTimeoutRef.current != null) {
+      window.clearTimeout(previewEndTimeoutRef.current);
+    }
+    previewEndTimeoutRef.current = window.setTimeout(() => {
       setPreviewWheelSpinning(false);
+      previewTickStopRef.current?.();
+      playWheelSound(didWin ? "win" : "miss", previewSoundOn);
       setPreviewResult(
         `Result: ${didWin ? "WIN" : "MISS"} (roll ${rolledValue.toFixed(3)} vs chance ${previewChancePercent.toFixed(1)}%)`,
       );
+      if (didWin) {
+        setPreviewWinBurstActive(true);
+        if (previewBurstTimeoutRef.current != null) {
+          window.clearTimeout(previewBurstTimeoutRef.current);
+        }
+        previewBurstTimeoutRef.current = window.setTimeout(() => setPreviewWinBurstActive(false), 1100);
+      } else {
+        setPreviewWinBurstActive(false);
+      }
     }, 4200);
   }
 
@@ -553,8 +588,8 @@ export default function GoalsSetupPage({ userId }: Props) {
         <div className="item-sub">
           Test the wheel with your current values above. This does not save or consume a real spin.
         </div>
-        <div className="goal-wheel-wrap">
-          <div className="goal-wheel-pointer" />
+        <div className={`goal-wheel-wrap ${previewWinBurstActive ? "is-win-burst" : ""}`}>
+          <div className={`goal-wheel-pointer ${previewWheelSpinning ? "is-ticking" : ""}`} />
           <div
             className={`goal-wheel ${previewWheelSpinning ? "is-spinning" : ""}`}
             style={{
@@ -564,15 +599,30 @@ export default function GoalsSetupPage({ userId }: Props) {
           >
             <span className="goal-wheel-center">TEST</span>
           </div>
+          {previewWinBurstActive && (
+            <>
+              <span className="goal-confetti goal-confetti-1" />
+              <span className="goal-confetti goal-confetti-2" />
+              <span className="goal-confetti goal-confetti-3" />
+              <span className="goal-confetti goal-confetti-4" />
+              <span className="goal-confetti goal-confetti-5" />
+              <span className="goal-confetti goal-confetti-6" />
+            </>
+          )}
         </div>
         <div className="goal-wheel-legend">
-          <span className="goal-wheel-legend-win">
-            Win zone: {previewChancePercent.toFixed(1)}%
-          </span>
+          <span className="goal-wheel-legend-win">Win zone: {previewChancePercent.toFixed(1)}%</span>
           <span className="goal-wheel-legend-miss">
             Miss zone: {(100 - previewChancePercent).toFixed(1)}%
           </span>
           <span className="goal-wheel-legend-miss">Segments: {previewSegmentCount}</span>
+          <button
+            className="btn secondary"
+            type="button"
+            onClick={() => setPreviewSoundOn((value) => !value)}
+          >
+            Sound: {previewSoundOn ? "On" : "Off"}
+          </button>
         </div>
         <button
           className="btn secondary"
