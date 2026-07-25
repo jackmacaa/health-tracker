@@ -15,6 +15,7 @@ import {
 import { tzOffsetNowMinutes } from "../lib/date";
 import { playWheelSound, startWheelTickTrack } from "../lib/wheelFx";
 import {
+  getActiveTemplatesForDate,
   isRewardEligible,
   isTemplateCompleted,
   keyByTemplateId,
@@ -221,17 +222,15 @@ export default function GoalsHistoryPage({ userId }: Props) {
     return { progressByDate, itemByDate, attemptsByDate };
   }, [tokenDatesWindow, progressRows, itemProgressRows, attemptRows]);
 
-  const activeTemplates = templates.filter((template) => template.active);
-
   const summaryByDate = useMemo(() => {
     const mapped: Record<string, ReturnType<typeof summarizeDay>> = {};
     tokenDatesWindow.forEach((date) => {
       const dayProgress = rowsByDate.progressByDate[date] ?? {};
       const dayItemProgress = rowsByDate.itemByDate[date] ?? {};
-      mapped[date] = summarizeDay(activeTemplates, dayProgress, dayItemProgress);
+      mapped[date] = summarizeDay(templates, dayProgress, dayItemProgress, date);
     });
     return mapped;
-  }, [tokenDatesWindow, rowsByDate, activeTemplates]);
+  }, [tokenDatesWindow, rowsByDate, templates]);
 
   const bankedSpinDates = useMemo(() => {
     if (!rewardSettings) return [] as string[];
@@ -491,8 +490,9 @@ export default function GoalsHistoryPage({ userId }: Props) {
         recentDates.map((date) => {
           const dayProgress = rowsByDate.progressByDate[date] ?? {};
           const dayItemProgress = rowsByDate.itemByDate[date] ?? {};
+          const activeTemplatesForDate = getActiveTemplatesForDate(templates, date);
           const summary =
-            summaryByDate[date] ?? summarizeDay(activeTemplates, dayProgress, dayItemProgress);
+            summaryByDate[date] ?? summarizeDay(templates, dayProgress, dayItemProgress, date);
           const attempt = rowsByDate.attemptsByDate[date] ?? null;
           const label = DateTime.fromISO(date).toFormat("ccc, LLL d");
           const hasBankedToken = bankedSpinDates.includes(date);
@@ -517,10 +517,10 @@ export default function GoalsHistoryPage({ userId }: Props) {
                 <div className="item-sub">Reward spin: Banked token available for this day</div>
               )}
               <div className="divider" />
-              {activeTemplates.length === 0 && (
+              {activeTemplatesForDate.length === 0 && (
                 <div className="item-sub">No active goals configured for this period.</div>
               )}
-              {activeTemplates.map((template) => {
+              {activeTemplatesForDate.map((template) => {
                 const done = isTemplateCompleted(template, dayProgress, dayItemProgress);
                 const progress = dayProgress[template.id];
                 return (

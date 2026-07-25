@@ -36,6 +36,28 @@ export function keyByTemplateItemId(rows: GoalDailyItemProgress[]) {
   }, {});
 }
 
+function wasCreatedOnOrBeforeLocalDate(createdAt: string, localDate: string) {
+  const createdLocalDate = DateTime.fromISO(createdAt).toLocal().toISODate();
+  return createdLocalDate == null || createdLocalDate <= localDate;
+}
+
+export function getActiveTemplatesForDate(
+  templates: GoalTemplateWithItems[],
+  localDate: string,
+) {
+  return templates
+    .filter(
+      (template) =>
+        template.active && wasCreatedOnOrBeforeLocalDate(template.created_at, localDate),
+    )
+    .map((template) => ({
+      ...template,
+      items: template.items.filter((item) =>
+        wasCreatedOnOrBeforeLocalDate(item.created_at, localDate),
+      ),
+    }));
+}
+
 export function isTemplateCompleted(
   template: GoalTemplateWithItems,
   progressByTemplateId: Record<string, GoalDailyProgress>,
@@ -62,8 +84,11 @@ export function summarizeDay(
   templates: GoalTemplateWithItems[],
   progressByTemplateId: Record<string, GoalDailyProgress>,
   itemProgressByItemId: Record<string, GoalDailyItemProgress>,
+  localDate?: string,
 ) {
-  const activeTemplates = templates.filter((template) => template.active);
+  const activeTemplates = localDate
+    ? getActiveTemplatesForDate(templates, localDate)
+    : templates.filter((template) => template.active);
   const completed = activeTemplates.filter((template) =>
     isTemplateCompleted(template, progressByTemplateId, itemProgressByItemId),
   ).length;
