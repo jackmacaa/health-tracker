@@ -415,6 +415,26 @@ textarea {
   cursor: not-allowed;
 }
 
+.goal-wheel-wrap-bonus {
+  width: 170px;
+  height: 170px;
+}
+
+.goal-wheel-bonus {
+  border: 6px dashed #93c5fd;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.2);
+}
+
+.goal-wheel-center-bonus {
+  border-color: #93c5fd;
+  color: #1e40af;
+  letter-spacing: 0.04em;
+}
+
+.goal-wheel-pointer-bonus {
+  border-top-color: #1e40af;
+}
+
 .goal-wheel-pointer {
   position: absolute;
   top: -6px;

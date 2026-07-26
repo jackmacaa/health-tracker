@@ -41,10 +41,7 @@ function wasCreatedOnOrBeforeLocalDate(createdAt: string, localDate: string) {
   return createdLocalDate == null || createdLocalDate <= localDate;
 }
 
-export function getActiveTemplatesForDate(
-  templates: GoalTemplateWithItems[],
-  localDate: string,
-) {
+export function getActiveTemplatesForDate(templates: GoalTemplateWithItems[], localDate: string) {
   return templates
     .filter(
       (template) =>
@@ -93,12 +90,37 @@ export function summarizeDay(
     isTemplateCompleted(template, progressByTemplateId, itemProgressByItemId),
   ).length;
   const total = activeTemplates.length;
+  const requiredTemplates = activeTemplates.filter((template) => template.required_for_reward);
+  const requiredCompleted = requiredTemplates.filter((template) =>
+    isTemplateCompleted(template, progressByTemplateId, itemProgressByItemId),
+  ).length;
   return {
     completed,
     total,
+    requiredCompleted,
+    requiredTotal: requiredTemplates.length,
+    requiredDone: requiredTemplates.length === 0 || requiredCompleted === requiredTemplates.length,
     percent: total > 0 ? (completed / total) * 100 : 0,
     done: total > 0 && completed === total,
   };
+}
+
+export function areRequiredGoalsCompleted(
+  templates: GoalTemplateWithItems[],
+  progressByTemplateId: Record<string, GoalDailyProgress>,
+  itemProgressByItemId: Record<string, GoalDailyItemProgress>,
+  localDate?: string,
+) {
+  const activeTemplates = localDate
+    ? getActiveTemplatesForDate(templates, localDate)
+    : templates.filter((template) => template.active);
+
+  const requiredTemplates = activeTemplates.filter((template) => template.required_for_reward);
+  if (requiredTemplates.length === 0) return true;
+
+  return requiredTemplates.every((template) =>
+    isTemplateCompleted(template, progressByTemplateId, itemProgressByItemId),
+  );
 }
 
 export function isRewardEligible(

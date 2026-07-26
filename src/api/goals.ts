@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import type {
+  GoalDailyNote,
   GoalDailyItemProgress,
   GoalDailyProgress,
   GoalKind,
@@ -57,6 +58,7 @@ export async function createGoalTemplate(input: {
   goal_kind: GoalKind;
   target_value: number | null;
   default_checked?: boolean;
+  required_for_reward?: boolean;
   active?: boolean;
   display_order?: number;
 }): Promise<GoalTemplate> {
@@ -81,6 +83,7 @@ export async function updateGoalTemplate(
     goal_kind: GoalKind;
     target_value: number | null;
     default_checked: boolean;
+    required_for_reward: boolean;
     active: boolean;
     display_order: number;
   }>,
@@ -232,4 +235,52 @@ export async function upsertGoalDailyItemProgress(input: {
     .single();
   if (error) throw error;
   return data as GoalDailyItemProgress;
+}
+
+export async function getGoalDailyNoteByDate(params: {
+  user_id: string;
+  local_date: string;
+}): Promise<GoalDailyNote | null> {
+  const { data, error } = await supabase
+    .from("goal_daily_notes")
+    .select("*")
+    .eq("user_id", params.user_id)
+    .eq("local_date", params.local_date)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as GoalDailyNote | null) ?? null;
+}
+
+export async function upsertGoalDailyNote(input: {
+  user_id: string;
+  occurred_at: string;
+  tz_offset_minutes: number;
+  note_text: string;
+}): Promise<GoalDailyNote> {
+  const noteText = input.note_text.trim();
+  const { data, error } = await supabase
+    .from("goal_daily_notes")
+    .upsert(
+      {
+        ...input,
+        note_text: noteText,
+      },
+      { onConflict: "user_id,local_date" },
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as GoalDailyNote;
+}
+
+export async function deleteGoalDailyNoteByDate(params: {
+  user_id: string;
+  local_date: string;
+}): Promise<void> {
+  const { error } = await supabase
+    .from("goal_daily_notes")
+    .delete()
+    .eq("user_id", params.user_id)
+    .eq("local_date", params.local_date);
+  if (error) throw error;
 }

@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DateTime } from "luxon";
 import {
+  bankSecondChanceForDate,
   getGoalRewardSettings,
   getGoalRewardAttemptByDate,
+  getGoalSecondChanceAttemptByDate,
+  spinSecondChanceForDate,
   spinGoalRewardForToday,
 } from "../api/goalRewards";
 import {
+  deleteGoalDailyNoteByDate,
+  getGoalDailyNoteByDate,
   listGoalDailyItemProgressByDate,
   listGoalDailyProgressByDate,
   listGoalTemplatesWithItems,
+  upsertGoalDailyNote,
   upsertGoalDailyItemProgress,
   upsertGoalDailyProgress,
 } from "../api/goals";
 import { tzOffsetNowMinutes } from "../lib/date";
 import { playWheelSound, startWheelTickTrack } from "../lib/wheelFx";
-import type { GoalRewardAttempt } from "../types";
+import type { GoalRewardAttempt, GoalSecondChanceAttempt } from "../types";
 import {
   occurredAtNoonUtc,
   isRewardEligible,
@@ -90,6 +96,19 @@ function buildWheelGradient(sectors: WheelSector[]) {
     .join(", ")})`;
 }
 
+function buildAlternatingWheelGradient(
+  sectors: WheelSector[],
+  colors: { win: [string, string]; lose: [string, string] },
+) {
+  return `conic-gradient(${sectors
+    .map((sector, index) => {
+      const palette = sector.win ? colors.win : colors.lose;
+      const color = palette[index % 2];
+      return `${color} ${sector.startDeg}deg ${sector.endDeg}deg`;
+    })
+    .join(", ")})`;
+}
+
 function pickLandingAngle(params: {
   sectors: WheelSector[];
   didWin: boolean;
@@ -131,11 +150,21 @@ export default function DailyGoalsPage({ userId }: Props) {
   const [rewardSettings, setRewardSettings] =
     useState<Awaited<ReturnType<typeof getGoalRewardSettings>>>(null);
   const [rewardAttempt, setRewardAttempt] = useState<GoalRewardAttempt | null>(null);
+  const [secondChanceAttempt, setSecondChanceAttempt] = useState<GoalSecondChanceAttempt | null>(
+    null,
+  );
   const [numberDrafts, setNumberDrafts] = useState<Record<string, string>>({});
+  const [dailyNoteDraft, setDailyNoteDraft] = useState("");
+  const [dailyNoteSaved, setDailyNoteSaved] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [secondChanceRotation, setSecondChanceRotation] = useState(0);
+  const [secondChanceSpinning, setSecondChanceSpinning] = useState(false);
   const spinTickStopRef = useRef<(() => void) | null>(null);
   const spinEndTimeoutRef = useRef<number | null>(null);
+  const secondChanceTickStopRef = useRef<(() => void) | null>(null);
+  const secondChanceEndTimeoutRef = useRef<number | null>(null);
 
   const localDate = toLocalDateISO(DateTime.local());
 
@@ -143,18 +172,24 @@ export default function DailyGoalsPage({ userId }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const [templateRows, progress, itemProgress, settings, attempt] = await Promise.all([
-        listGoalTemplatesWithItems(userId),
-        listGoalDailyProgressByDate({ user_id: userId, local_date: localDate }),
-        listGoalDailyItemProgressByDate({ user_id: userId, local_date: localDate }),
-        getGoalRewardSettings(userId),
-        getGoalRewardAttemptByDate({ user_id: userId, local_date: localDate }),
-      ]);
+      const [templateRows, progress, itemProgress, settings, attempt, secondChance, note] =
+        await Promise.all([
+          listGoalTemplatesWithItems(userId),
+          listGoalDailyProgressByDate({ user_id: userId, local_date: localDate }),
+          listGoalDailyItemProgressByDate({ user_id: userId, local_date: localDate }),
+          getGoalRewardSettings(userId),
+          getGoalRewardAttemptByDate({ user_id: userId, local_date: localDate }),
+          getGoalSecondChanceAttemptByDate({ user_id: userId, local_date: localDate }),
+          getGoalDailyNoteByDate({ user_id: userId, local_date: localDate }),
+        ]);
       setTemplates(templateRows);
       setProgressRows(progress);
       setItemProgressRows(itemProgress);
       setRewardSettings(settings);
       setRewardAttempt(attempt);
+      setSecondChanceAttempt(secondChance);
+      setDailyNoteDraft(note?.note_text ?? "");
+      setDailyNoteSaved(note?.note_text ?? "");
       setNumberDrafts({});
     } catch (e: any) {
       setError(e.message ?? String(e));
@@ -179,9 +214,26 @@ export default function DailyGoalsPage({ userId }: Props) {
   );
 
   const eligibleForReward = useMemo(
-    () => isRewardEligible(rewardSettings, summary.completed, summary.total),
+    () =>
+      isRewardEligible(rewardSettings, summary.completed, summary.total) && summary.requiredDone,
     [rewardSettings, summary],
   );
+
+  const secondChanceEligible = useMemo(() => {
+    if (!rewardSettings?.second_chance_enabled) return false;
+    if (eligibleForReward) return false;
+    if (!summary.requiredDone) return false;
+
+    return isRewardEligible(
+      {
+        ...rewardSettings,
+        threshold_mode: rewardSettings.second_chance_threshold_mode,
+        threshold_value: rewardSettings.second_chance_threshold_value,
+      },
+      summary.completed,
+      summary.total,
+    );
+  }, [rewardSettings, summary, eligibleForReward]);
 
   const chancePercent = Math.max(0, Math.min(100, rewardSettings?.chance_percent ?? 0));
   const wheelSegmentCount = Math.max(2, Math.min(72, rewardSettings?.wheel_segment_count ?? 12));
@@ -190,10 +242,58 @@ export default function DailyGoalsPage({ userId }: Props) {
     [chancePercent, wheelSegmentCount],
   );
   const wheelGradient = useMemo(() => buildWheelGradient(wheelSectors), [wheelSectors]);
+  const secondChanceChancePercent = Math.max(
+    0,
+    Math.min(100, rewardSettings?.second_chance_chance_percent ?? 10),
+  );
+  const secondChanceSectors = useMemo(
+    () => buildWheelSectors(secondChanceChancePercent, wheelSegmentCount),
+    [secondChanceChancePercent, wheelSegmentCount],
+  );
+  const secondChanceGradient = useMemo(
+    () =>
+      buildAlternatingWheelGradient(secondChanceSectors, {
+        win: ["#2563eb", "#3b82f6"],
+        lose: ["#f59e0b", "#fbbf24"],
+      }),
+    [secondChanceSectors],
+  );
   const allGoalsCompleted = summary.total > 0 && summary.done;
 
-  const isChecklistLocked = rewardAttempt != null;
+  const isChecklistLocked = rewardAttempt != null || secondChanceAttempt != null;
   const canSpinToday = Boolean(rewardSettings) && eligibleForReward && !rewardAttempt;
+  const canUseSecondChanceToday =
+    Boolean(rewardSettings?.second_chance_enabled) && secondChanceEligible && !secondChanceAttempt;
+  const secondChanceLockReason = useMemo(() => {
+    if (!rewardSettings?.second_chance_enabled) {
+      return "Enable second chance in Goals Setup.";
+    }
+    if (secondChanceAttempt) {
+      return "Second chance already used for today.";
+    }
+    if (!summary.requiredDone) {
+      return "Complete required goals to unlock second chance.";
+    }
+    if (eligibleForReward) {
+      return "Main reward spin is unlocked instead.";
+    }
+    if (!secondChanceEligible) {
+      return "Reach the second chance threshold to unlock.";
+    }
+    return null;
+  }, [
+    rewardSettings,
+    secondChanceAttempt,
+    summary.requiredDone,
+    eligibleForReward,
+    secondChanceEligible,
+  ]);
+  const showRewardWheel =
+    !rewardSettings ||
+    !rewardSettings.second_chance_enabled ||
+    eligibleForReward ||
+    rewardAttempt != null;
+  const showSecondChanceWheel = Boolean(rewardSettings?.second_chance_enabled) && !showRewardWheel;
 
   const activeTemplates = useMemo(() => {
     const active = templates.filter((template) => template.active);
@@ -212,6 +312,10 @@ export default function DailyGoalsPage({ userId }: Props) {
       spinTickStopRef.current?.();
       if (spinEndTimeoutRef.current != null) {
         window.clearTimeout(spinEndTimeoutRef.current);
+      }
+      secondChanceTickStopRef.current?.();
+      if (secondChanceEndTimeoutRef.current != null) {
+        window.clearTimeout(secondChanceEndTimeoutRef.current);
       }
     };
   }, []);
@@ -291,6 +395,134 @@ export default function DailyGoalsPage({ userId }: Props) {
     }
   }
 
+  async function spinSecondChanceToday() {
+    if (!rewardSettings?.second_chance_enabled) {
+      setError("Enable second chance in Goals Setup first.");
+      return;
+    }
+    if (secondChanceAttempt) {
+      setError("Second chance already used for today.");
+      return;
+    }
+    if (!secondChanceEligible) {
+      setError("Complete more goals to unlock second chance.");
+      return;
+    }
+    const confirmed = window.confirm(
+      "Use second chance now? This locks today's checklists and may prevent reaching the main reward spin later.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    let didCreateAttempt = false;
+    let didWinResult = false;
+    try {
+      const attempt = await spinSecondChanceForDate({
+        user_id: userId,
+        local_date: localDate,
+        tz_offset_minutes: tzOffsetNowMinutes(),
+        settings: rewardSettings,
+        eligible_goal_count: summary.completed,
+        total_goal_count: summary.total,
+        required_goals_completed: summary.requiredDone,
+      });
+      didCreateAttempt = true;
+      didWinResult = attempt.did_win;
+
+      const desiredPointerAngle = pickLandingAngle({
+        sectors: secondChanceSectors,
+        didWin: attempt.did_win,
+        rolledPercent: attempt.rolled_value ?? 0,
+      });
+
+      setSecondChanceSpinning(true);
+      playWheelSound("start", true);
+      secondChanceTickStopRef.current?.();
+      secondChanceTickStopRef.current = startWheelTickTrack(3200, true);
+      setSecondChanceRotation((prev) => {
+        const currentNormalized = ((prev % 360) + 360) % 360;
+        const finalNormalized = (360 - desiredPointerAngle) % 360;
+        const deltaNormalized = (finalNormalized - currentNormalized + 360) % 360;
+        const spinDegrees = 2880 + deltaNormalized;
+        return prev + spinDegrees;
+      });
+
+      setSuccess(
+        attempt.did_win
+          ? `${rewardSettings.second_chance_label}: WIN (+1 token)`
+          : `${rewardSettings.second_chance_label}: MISS`,
+      );
+      await load();
+    } catch (e: any) {
+      setError(e.message ?? String(e));
+    } finally {
+      if (!didCreateAttempt) {
+        secondChanceTickStopRef.current?.();
+        setSecondChanceSpinning(false);
+        setSaving(false);
+        return;
+      }
+
+      if (secondChanceEndTimeoutRef.current != null) {
+        window.clearTimeout(secondChanceEndTimeoutRef.current);
+      }
+      secondChanceEndTimeoutRef.current = window.setTimeout(() => {
+        setSecondChanceSpinning(false);
+        secondChanceTickStopRef.current?.();
+        playWheelSound(didWinResult ? "win" : "miss", true);
+      }, 3400);
+      setSaving(false);
+    }
+  }
+
+  async function bankSecondChanceToday() {
+    if (!rewardSettings?.second_chance_enabled) {
+      setError("Enable second chance in Goals Setup first.");
+      return;
+    }
+    if (secondChanceAttempt) {
+      setError("Second chance already used for today.");
+      return;
+    }
+    if (!secondChanceEligible) {
+      setError("Complete more goals to unlock second chance.");
+      return;
+    }
+    const confirmed = window.confirm(
+      "Bank second chance now? This locks today's checklists and may prevent reaching the main reward spin later.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const attempt = await bankSecondChanceForDate({
+        user_id: userId,
+        local_date: localDate,
+        tz_offset_minutes: tzOffsetNowMinutes(),
+        settings: rewardSettings,
+        eligible_goal_count: summary.completed,
+        total_goal_count: summary.total,
+        required_goals_completed: summary.requiredDone,
+      });
+      setSuccess(
+        `${rewardSettings.second_chance_label}: banked +${attempt.awarded_fraction.toFixed(2)} token`,
+      );
+      await load();
+    } catch (e: any) {
+      setError(e.message ?? String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveCheckboxTemplate(templateId: string, checked: boolean) {
     if (isChecklistLocked) return;
     setSaving(true);
@@ -311,6 +543,58 @@ export default function DailyGoalsPage({ userId }: Props) {
       setError(e.message ?? String(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveDailyNote() {
+    const trimmed = dailyNoteDraft.trim();
+    if (!trimmed) {
+      setError("Daily note cannot be empty.");
+      return;
+    }
+
+    setNoteSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const saved = await upsertGoalDailyNote({
+        user_id: userId,
+        occurred_at: occurredAtNoonUtc(localDate),
+        tz_offset_minutes: tzOffsetNowMinutes(),
+        note_text: trimmed,
+      });
+      setDailyNoteDraft(saved.note_text);
+      setDailyNoteSaved(saved.note_text);
+      setSuccess("Note saved.");
+    } catch (e: any) {
+      setError(e.message ?? String(e));
+    } finally {
+      setNoteSaving(false);
+    }
+  }
+
+  async function clearDailyNote() {
+    const hasAnyText = dailyNoteDraft.trim().length > 0 || dailyNoteSaved.trim().length > 0;
+    if (!hasAnyText) return;
+
+    const confirmed = window.confirm("Clear today's note?");
+    if (!confirmed) return;
+
+    setNoteSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await deleteGoalDailyNoteByDate({
+        user_id: userId,
+        local_date: localDate,
+      });
+      setDailyNoteDraft("");
+      setDailyNoteSaved("");
+      setSuccess("Note cleared.");
+    } catch (e: any) {
+      setError(e.message ?? String(e));
+    } finally {
+      setNoteSaving(false);
     }
   }
 
@@ -406,9 +690,14 @@ export default function DailyGoalsPage({ userId }: Props) {
             className="goal-wheel-center"
             type="button"
             disabled={saving || wheelSpinning || !canSpinToday}
+            title={
+              canSpinToday
+                ? "Spin reward wheel"
+                : "Reward spin is locked until you meet today's threshold."
+            }
             onClick={spinTodayReward}
           >
-            {wheelSpinning ? "..." : "SPIN"}
+            {wheelSpinning ? "..." : canSpinToday ? "SPIN" : "LOCKED"}
           </button>
         </div>
       </div>
@@ -431,6 +720,9 @@ export default function DailyGoalsPage({ userId }: Props) {
             Unlock rule: {rewardSettings.threshold_mode === "count" ? "count" : "percent"} ≥{" "}
             {rewardSettings.threshold_value}
           </div>
+          <div className="item-sub">
+            Required goals: {summary.requiredCompleted}/{summary.requiredTotal}
+          </div>
           {rewardAttempt ? (
             <div className="goal-attempt-box">
               Today's spin already used: {rewardAttempt.did_win ? "WIN" : "MISS"}
@@ -447,10 +739,93 @@ export default function DailyGoalsPage({ userId }: Props) {
     </div>
   );
 
+  const secondChanceCard = rewardSettings?.second_chance_enabled && (
+    <div className="card stack">
+      <div style={{ fontWeight: 700 }}>{rewardSettings.second_chance_label}</div>
+      <div className="item-sub">
+        Finish strong mode: this unlocks when you miss the main reward threshold but still hit your
+        configured second chance threshold.
+      </div>
+      <div className="item-sub" style={{ color: "#991b1b" }}>
+        Using second chance locks today's checklists. If you are still close to the main threshold,
+        you may want to finish goals first.
+      </div>
+      <div className="goal-wheel-wrap goal-wheel-wrap-bonus">
+        <div
+          className={`goal-wheel-pointer goal-wheel-pointer-bonus ${secondChanceSpinning ? "is-ticking" : ""}`}
+        />
+        <div
+          className={`goal-wheel goal-wheel-bonus ${secondChanceSpinning ? "is-spinning" : ""}`}
+          style={{
+            transform: `rotate(${secondChanceRotation}deg)`,
+            background: secondChanceGradient,
+          }}
+        >
+          <button
+            className="goal-wheel-center goal-wheel-center-bonus"
+            type="button"
+            disabled={saving || secondChanceSpinning || !canUseSecondChanceToday}
+            title={
+              canUseSecondChanceToday
+                ? "Spin second chance wheel"
+                : (secondChanceLockReason ?? "Second chance is not unlocked yet.")
+            }
+            onClick={spinSecondChanceToday}
+          >
+            {secondChanceSpinning ? "..." : canUseSecondChanceToday ? "TRY" : "LOCKED"}
+          </button>
+        </div>
+      </div>
+      <div className="goal-wheel-legend">
+        <span className="goal-wheel-legend-win">
+          Win zone: {secondChanceChancePercent.toFixed(1)}%
+        </span>
+        <span className="goal-wheel-legend-miss">
+          Bank value: {(secondChanceChancePercent / 100).toFixed(2)} token
+        </span>
+        <span className="goal-wheel-legend-miss">Segments: {wheelSegmentCount}</span>
+      </div>
+      <div className="row" style={{ gap: "8px" }}>
+        <button
+          className="btn secondary"
+          type="button"
+          disabled={saving || secondChanceSpinning || !canUseSecondChanceToday}
+          title={
+            canUseSecondChanceToday
+              ? "Bank second chance value"
+              : (secondChanceLockReason ?? "Second chance bank is not unlocked yet.")
+          }
+          onClick={bankSecondChanceToday}
+        >
+          {canUseSecondChanceToday ? "Bank Instead" : "Bank Locked"}
+        </button>
+      </div>
+      {!canUseSecondChanceToday && !secondChanceAttempt && (
+        <div className="item-sub" style={{ color: "#92400e" }}>
+          Locked: {secondChanceLockReason ?? "Second chance is not unlocked yet."}
+        </div>
+      )}
+      {secondChanceAttempt ? (
+        <div className="goal-attempt-box">
+          Today's result:{" "}
+          {secondChanceAttempt.action === "spin"
+            ? secondChanceAttempt.did_win
+              ? "SPIN WIN (+1 token)"
+              : "SPIN MISS"
+            : `BANKED +${secondChanceAttempt.awarded_fraction.toFixed(2)} token`}
+        </div>
+      ) : (
+        <div className="goal-attempt-box">
+          {canUseSecondChanceToday
+            ? "You unlocked second chance. Spin for +1 token or bank the expected value now."
+            : "Unlock by reaching second chance threshold and completing required goals."}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="stack">
-      {allGoalsCompleted && rewardCard}
-
       <div className="card stack">
         <div style={{ fontWeight: 700 }}>Daily Goals</div>
         <div className="item-sub">{DateTime.fromISO(localDate).toFormat("cccc, LLL d")}</div>
@@ -461,6 +836,11 @@ export default function DailyGoalsPage({ userId }: Props) {
           <div className="goal-pill">{summary.percent.toFixed(0)}%</div>
           <div className={`goal-pill ${summary.done ? "goal-pill-success" : "goal-pill-fail"}`}>
             {summary.done ? "Overall: Complete" : "Overall: In Progress"}
+          </div>
+          <div
+            className={`goal-pill ${summary.requiredDone ? "goal-pill-success" : "goal-pill-fail"}`}
+          >
+            Required: {summary.requiredCompleted}/{summary.requiredTotal}
           </div>
           <div
             className={`goal-pill ${isChecklistLocked ? "goal-pill-fail" : "goal-pill-success"}`}
@@ -498,6 +878,9 @@ export default function DailyGoalsPage({ userId }: Props) {
                         ? `Checklist: ${template.items.length} items`
                         : "Single checkbox"}
                   </div>
+                  {template.required_for_reward && (
+                    <div className="item-sub">Required for reward eligibility</div>
+                  )}
                 </div>
                 <div className={completed ? "goal-status-ok" : "goal-status-bad"}>
                   {completed ? "✅" : "❌"}
@@ -600,7 +983,49 @@ export default function DailyGoalsPage({ userId }: Props) {
           );
         })}
 
-      {!allGoalsCompleted && rewardCard}
+      <div className="card stack">
+        <div style={{ fontWeight: 700 }}>Daily Notes</div>
+        <div className="item-sub">Write a short note for today.</div>
+        <textarea
+          value={dailyNoteDraft}
+          onChange={(e) => setDailyNoteDraft(e.target.value)}
+          placeholder="How did today go?"
+          maxLength={2000}
+          disabled={noteSaving}
+        />
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <div className="item-sub">{dailyNoteDraft.trim().length}/2000</div>
+          <div className="row" style={{ gap: "8px" }}>
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={
+                noteSaving ||
+                (dailyNoteDraft.trim().length === 0 && dailyNoteSaved.trim().length === 0)
+              }
+              onClick={() => void clearDailyNote()}
+            >
+              {noteSaving ? "..." : "Clear"}
+            </button>
+            <button
+              className="btn secondary"
+              type="button"
+              disabled={
+                noteSaving ||
+                dailyNoteDraft.trim().length === 0 ||
+                dailyNoteDraft === dailyNoteSaved
+              }
+              onClick={() => void saveDailyNote()}
+            >
+              {noteSaving ? "Saving..." : "Save note"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {showRewardWheel && rewardCard}
+
+      {showSecondChanceWheel && secondChanceCard}
 
       {error && (
         <div className="card" style={{ color: "#dc2626" }}>

@@ -216,6 +216,7 @@ create table if not exists public.goal_templates (
   goal_kind text not null,
   target_value integer,
   default_checked boolean not null default false,
+  required_for_reward boolean not null default false,
   active boolean not null default true,
   display_order integer not null default 0,
   created_at timestamptz not null default now(),
@@ -270,6 +271,20 @@ create table if not exists public.goal_daily_item_progress (
   unique (user_id, template_item_id, local_date)
 );
 
+create table if not exists public.goal_daily_notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  occurred_at timestamptz not null,
+  tz_offset_minutes integer not null,
+  local_date date not null,
+  note_text text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint goal_daily_notes_tz_offset_range check (tz_offset_minutes between -840 and 840),
+  constraint goal_daily_notes_text_length check (char_length(trim(note_text)) between 1 and 2000),
+  unique (user_id, local_date)
+);
+
 create table if not exists public.goal_reward_settings (
   user_id uuid primary key references auth.users(id) on delete cascade,
   reward_label text not null,
@@ -277,6 +292,11 @@ create table if not exists public.goal_reward_settings (
   wheel_segment_count integer not null default 12,
   threshold_mode text not null,
   threshold_value numeric(6,2) not null,
+  second_chance_enabled boolean not null default true,
+  second_chance_label text not null default 'Second chance spin',
+  second_chance_chance_percent numeric(5,2) not null default 10,
+  second_chance_threshold_mode text not null default 'percent',
+  second_chance_threshold_value numeric(6,2) not null default 75,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint reward_label_length check (char_length(trim(reward_label)) between 1 and 120),
@@ -286,6 +306,23 @@ create table if not exists public.goal_reward_settings (
   constraint reward_threshold_value_valid check (
     (threshold_mode = 'count' and threshold_value > 0)
     or (threshold_mode = 'percent' and threshold_value > 0 and threshold_value <= 100)
+  ),
+  constraint reward_second_chance_label_length check (
+    char_length(trim(second_chance_label)) between 1 and 120
+  ),
+  constraint reward_second_chance_chance_range check (
+    second_chance_chance_percent >= 0 and second_chance_chance_percent <= 100
+  ),
+  constraint reward_second_chance_threshold_mode_valid check (
+    second_chance_threshold_mode in ('count', 'percent')
+  ),
+  constraint reward_second_chance_threshold_value_valid check (
+    (second_chance_threshold_mode = 'count' and second_chance_threshold_value > 0)
+    or (
+      second_chance_threshold_mode = 'percent'
+      and second_chance_threshold_value > 0
+      and second_chance_threshold_value <= 100
+    )
   )
 );
 
@@ -321,6 +358,46 @@ create table if not exists public.goal_reward_attempts (
   constraint reward_attempt_note_length check (
     redeemed_note is null or (char_length(trim(redeemed_note)) between 1 and 240)
   ),
+  unique (user_id, local_date)
+);
+
+create table if not exists public.goal_reward_token_bank (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  fractional_balance numeric(10,4) not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint goal_reward_token_bank_balance_non_negative check (fractional_balance >= 0)
+);
+
+create table if not exists public.goal_second_chance_attempts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  occurred_at timestamptz not null,
+  tz_offset_minutes integer not null,
+  local_date date not null,
+  eligible_goal_count integer not null,
+  total_goal_count integer not null,
+  threshold_mode text not null,
+  threshold_value numeric(6,2) not null,
+  chance_percent numeric(5,2) not null,
+  action text not null,
+  rolled_value numeric(6,3),
+  did_win boolean not null,
+  awarded_fraction numeric(10,4) not null default 0,
+  created_at timestamptz not null default now(),
+  constraint second_chance_tz_offset_range check (tz_offset_minutes between -840 and 840),
+  constraint second_chance_counts_valid check (
+    eligible_goal_count >= 0 and total_goal_count >= 0 and eligible_goal_count <= total_goal_count
+  ),
+  constraint second_chance_threshold_mode_valid check (threshold_mode in ('count', 'percent')),
+  constraint second_chance_threshold_value_valid check (
+    (threshold_mode = 'count' and threshold_value > 0)
+    or (threshold_mode = 'percent' and threshold_value > 0 and threshold_value <= 100)
+  ),
+  constraint second_chance_chance_range check (chance_percent >= 0 and chance_percent <= 100),
+  constraint second_chance_action_valid check (action in ('spin', 'bank', 'auto_bank')),
+  constraint second_chance_roll_range check (rolled_value is null or (rolled_value >= 0 and rolled_value <= 100)),
+  constraint second_chance_awarded_non_negative check (awarded_fraction >= 0),
   unique (user_id, local_date)
 );
 
@@ -361,14 +438,34 @@ create trigger trg_goal_daily_item_progress_updated_at
 before update on public.goal_daily_item_progress
 for each row execute function public.set_updated_at();
 
+drop trigger if exists trg_goal_daily_notes_local_date on public.goal_daily_notes;
+create trigger trg_goal_daily_notes_local_date
+before insert or update on public.goal_daily_notes
+for each row execute function public.set_local_date_from_offset();
+
+drop trigger if exists trg_goal_daily_notes_updated_at on public.goal_daily_notes;
+create trigger trg_goal_daily_notes_updated_at
+before update on public.goal_daily_notes
+for each row execute function public.set_updated_at();
+
 drop trigger if exists trg_goal_reward_settings_updated_at on public.goal_reward_settings;
 create trigger trg_goal_reward_settings_updated_at
 before update on public.goal_reward_settings
 for each row execute function public.set_updated_at();
 
+drop trigger if exists trg_goal_reward_token_bank_updated_at on public.goal_reward_token_bank;
+create trigger trg_goal_reward_token_bank_updated_at
+before update on public.goal_reward_token_bank
+for each row execute function public.set_updated_at();
+
 drop trigger if exists trg_goal_reward_attempts_local_date on public.goal_reward_attempts;
 create trigger trg_goal_reward_attempts_local_date
 before insert or update on public.goal_reward_attempts
+for each row execute function public.set_local_date_from_offset();
+
+drop trigger if exists trg_goal_second_chance_attempts_local_date on public.goal_second_chance_attempts;
+create trigger trg_goal_second_chance_attempts_local_date
+before insert or update on public.goal_second_chance_attempts
 for each row execute function public.set_local_date_from_offset();
 
 create index if not exists idx_goal_templates_user_order
@@ -379,18 +476,25 @@ create index if not exists idx_goal_daily_progress_user_date
   on public.goal_daily_progress (user_id, local_date desc);
 create index if not exists idx_goal_daily_item_progress_user_date
   on public.goal_daily_item_progress (user_id, local_date desc);
+create index if not exists idx_goal_daily_notes_user_date
+  on public.goal_daily_notes (user_id, local_date desc);
 create index if not exists idx_goal_reward_attempts_user_date
   on public.goal_reward_attempts (user_id, local_date desc);
 create index if not exists idx_goal_reward_attempts_user_unredeemed
   on public.goal_reward_attempts (user_id, occurred_at asc)
   where did_win = true and redeemed_at is null;
+create index if not exists idx_goal_second_chance_attempts_user_date
+  on public.goal_second_chance_attempts (user_id, local_date desc);
 
 alter table public.goal_templates enable row level security;
 alter table public.goal_template_items enable row level security;
 alter table public.goal_daily_progress enable row level security;
 alter table public.goal_daily_item_progress enable row level security;
+alter table public.goal_daily_notes enable row level security;
 alter table public.goal_reward_settings enable row level security;
 alter table public.goal_reward_attempts enable row level security;
+alter table public.goal_reward_token_bank enable row level security;
+alter table public.goal_second_chance_attempts enable row level security;
 
 drop policy if exists "goal_templates_select_own" on public.goal_templates;
 create policy "goal_templates_select_own"
@@ -457,6 +561,17 @@ create policy "goal_daily_item_progress_upsert_own"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "goal_daily_notes_select_own" on public.goal_daily_notes;
+create policy "goal_daily_notes_select_own"
+  on public.goal_daily_notes for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "goal_daily_notes_upsert_own" on public.goal_daily_notes;
+create policy "goal_daily_notes_upsert_own"
+  on public.goal_daily_notes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
 drop policy if exists "goal_reward_settings_select_own" on public.goal_reward_settings;
 create policy "goal_reward_settings_select_own"
   on public.goal_reward_settings for select
@@ -476,5 +591,27 @@ create policy "goal_reward_attempts_select_own"
 drop policy if exists "goal_reward_attempts_upsert_own" on public.goal_reward_attempts;
 create policy "goal_reward_attempts_upsert_own"
   on public.goal_reward_attempts for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "goal_reward_token_bank_select_own" on public.goal_reward_token_bank;
+create policy "goal_reward_token_bank_select_own"
+  on public.goal_reward_token_bank for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "goal_reward_token_bank_upsert_own" on public.goal_reward_token_bank;
+create policy "goal_reward_token_bank_upsert_own"
+  on public.goal_reward_token_bank for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "goal_second_chance_attempts_select_own" on public.goal_second_chance_attempts;
+create policy "goal_second_chance_attempts_select_own"
+  on public.goal_second_chance_attempts for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "goal_second_chance_attempts_upsert_own" on public.goal_second_chance_attempts;
+create policy "goal_second_chance_attempts_upsert_own"
+  on public.goal_second_chance_attempts for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);

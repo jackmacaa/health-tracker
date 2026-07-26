@@ -2,6 +2,7 @@ export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 export type FilterKind = "today" | "week" | "month" | "alltime";
 export type GoalKind = "checkbox" | "number";
 export type RewardThresholdMode = "count" | "percent";
+export type GoalSecondChanceAction = "spin" | "bank" | "auto_bank";
 
 export interface Entry {
   id: string;
@@ -61,6 +62,7 @@ export interface GoalTemplate {
   goal_kind: GoalKind;
   target_value: number | null;
   default_checked: boolean;
+  required_for_reward: boolean;
   active: boolean;
   display_order: number;
   created_at: string;
@@ -102,6 +104,17 @@ export interface GoalDailyItemProgress {
   updated_at: string;
 }
 
+export interface GoalDailyNote {
+  id: string;
+  user_id: string;
+  occurred_at: string;
+  tz_offset_minutes: number;
+  local_date: string;
+  note_text: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GoalRewardSettings {
   user_id: string;
   reward_label: string;
@@ -109,6 +122,11 @@ export interface GoalRewardSettings {
   wheel_segment_count: number;
   threshold_mode: RewardThresholdMode;
   threshold_value: number;
+  second_chance_enabled: boolean;
+  second_chance_label: string;
+  second_chance_chance_percent: number;
+  second_chance_threshold_mode: RewardThresholdMode;
+  second_chance_threshold_value: number;
   created_at: string;
   updated_at: string;
 }
@@ -130,4 +148,29 @@ export interface GoalRewardAttempt {
   redeemed_at: string | null;
   redeemed_note: string | null;
   created_at: string;
+}
+
+export interface GoalSecondChanceAttempt {
+  id: string;
+  user_id: string;
+  occurred_at: string;
+  tz_offset_minutes: number;
+  local_date: string;
+  eligible_goal_count: number;
+  total_goal_count: number;
+  threshold_mode: RewardThresholdMode;
+  threshold_value: number;
+  chance_percent: number;
+  action: GoalSecondChanceAction;
+  rolled_value: number | null;
+  did_win: boolean;
+  awarded_fraction: number;
+  created_at: string;
+}
+
+export interface GoalRewardTokenBank {
+  user_id: string;
+  fractional_balance: number;
+  created_at: string;
+  updated_at: string;
 }
