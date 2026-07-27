@@ -347,6 +347,7 @@ export default function DailyGoalsPage({ userId }: Props) {
         settings: rewardSettings,
         eligible_goal_count: summary.completed,
         total_goal_count: summary.total,
+        required_goals_completed: summary.requiredDone,
       });
       didCreateAttempt = true;
       didWinResult = attempt.did_win;
