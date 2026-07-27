@@ -159,12 +159,16 @@ export default function DailyGoalsPage({ userId }: Props) {
   const [noteSaving, setNoteSaving] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [winBurstActive, setWinBurstActive] = useState(false);
   const [secondChanceRotation, setSecondChanceRotation] = useState(0);
   const [secondChanceSpinning, setSecondChanceSpinning] = useState(false);
+  const [secondChanceWinBurstActive, setSecondChanceWinBurstActive] = useState(false);
   const spinTickStopRef = useRef<(() => void) | null>(null);
   const spinEndTimeoutRef = useRef<number | null>(null);
+  const spinBurstTimeoutRef = useRef<number | null>(null);
   const secondChanceTickStopRef = useRef<(() => void) | null>(null);
   const secondChanceEndTimeoutRef = useRef<number | null>(null);
+  const secondChanceBurstTimeoutRef = useRef<number | null>(null);
 
   const localDate = toLocalDateISO(DateTime.local());
 
@@ -313,9 +317,15 @@ export default function DailyGoalsPage({ userId }: Props) {
       if (spinEndTimeoutRef.current != null) {
         window.clearTimeout(spinEndTimeoutRef.current);
       }
+      if (spinBurstTimeoutRef.current != null) {
+        window.clearTimeout(spinBurstTimeoutRef.current);
+      }
       secondChanceTickStopRef.current?.();
       if (secondChanceEndTimeoutRef.current != null) {
         window.clearTimeout(secondChanceEndTimeoutRef.current);
+      }
+      if (secondChanceBurstTimeoutRef.current != null) {
+        window.clearTimeout(secondChanceBurstTimeoutRef.current);
       }
     };
   }, []);
@@ -337,8 +347,10 @@ export default function DailyGoalsPage({ userId }: Props) {
     setSaving(true);
     setError(null);
     setSuccess(null);
+    setWinBurstActive(false);
     let didCreateAttempt = false;
     let didWinResult = false;
+    let rewardLabelText = rewardSettings.reward_label;
     try {
       const attempt = await spinGoalRewardForToday({
         user_id: userId,
@@ -351,6 +363,7 @@ export default function DailyGoalsPage({ userId }: Props) {
       });
       didCreateAttempt = true;
       didWinResult = attempt.did_win;
+      rewardLabelText = attempt.reward_label;
 
       const desiredPointerAngle = pickLandingAngle({
         sectors: wheelSectors,
@@ -369,17 +382,13 @@ export default function DailyGoalsPage({ userId }: Props) {
         const spinDegrees = 3600 + deltaNormalized;
         return prev + spinDegrees;
       });
-
-      setSuccess(
-        attempt.did_win ? `Today's spin: WIN (${attempt.reward_label})` : "Today's spin: MISS",
-      );
-      await load();
     } catch (e: any) {
       setError(e.message ?? String(e));
     } finally {
       if (!didCreateAttempt) {
         spinTickStopRef.current?.();
         setWheelSpinning(false);
+        setWinBurstActive(false);
         setSaving(false);
         return;
       }
@@ -391,6 +400,19 @@ export default function DailyGoalsPage({ userId }: Props) {
         setWheelSpinning(false);
         spinTickStopRef.current?.();
         playWheelSound(didWinResult ? "win" : "miss", true);
+        setSuccess(didWinResult ? `Today's spin: WIN (${rewardLabelText})` : "Today's spin: MISS");
+        if (didWinResult) {
+          setWinBurstActive(true);
+          if (spinBurstTimeoutRef.current != null) {
+            window.clearTimeout(spinBurstTimeoutRef.current);
+          }
+          spinBurstTimeoutRef.current = window.setTimeout(() => {
+            setWinBurstActive(false);
+          }, 1100);
+        } else {
+          setWinBurstActive(false);
+        }
+        void load();
       }, 4200);
       setSaving(false);
     }
@@ -419,8 +441,10 @@ export default function DailyGoalsPage({ userId }: Props) {
     setSaving(true);
     setError(null);
     setSuccess(null);
+    setSecondChanceWinBurstActive(false);
     let didCreateAttempt = false;
     let didWinResult = false;
+    let secondChanceLabelText = rewardSettings.second_chance_label;
     try {
       const attempt = await spinSecondChanceForDate({
         user_id: userId,
@@ -433,6 +457,7 @@ export default function DailyGoalsPage({ userId }: Props) {
       });
       didCreateAttempt = true;
       didWinResult = attempt.did_win;
+      secondChanceLabelText = rewardSettings.second_chance_label;
 
       const desiredPointerAngle = pickLandingAngle({
         sectors: secondChanceSectors,
@@ -451,19 +476,13 @@ export default function DailyGoalsPage({ userId }: Props) {
         const spinDegrees = 2880 + deltaNormalized;
         return prev + spinDegrees;
       });
-
-      setSuccess(
-        attempt.did_win
-          ? `${rewardSettings.second_chance_label}: WIN (+1 token)`
-          : `${rewardSettings.second_chance_label}: MISS`,
-      );
-      await load();
     } catch (e: any) {
       setError(e.message ?? String(e));
     } finally {
       if (!didCreateAttempt) {
         secondChanceTickStopRef.current?.();
         setSecondChanceSpinning(false);
+        setSecondChanceWinBurstActive(false);
         setSaving(false);
         return;
       }
@@ -475,6 +494,23 @@ export default function DailyGoalsPage({ userId }: Props) {
         setSecondChanceSpinning(false);
         secondChanceTickStopRef.current?.();
         playWheelSound(didWinResult ? "win" : "miss", true);
+        setSuccess(
+          didWinResult
+            ? `${secondChanceLabelText}: WIN (+1 token)`
+            : `${secondChanceLabelText}: MISS`,
+        );
+        if (didWinResult) {
+          setSecondChanceWinBurstActive(true);
+          if (secondChanceBurstTimeoutRef.current != null) {
+            window.clearTimeout(secondChanceBurstTimeoutRef.current);
+          }
+          secondChanceBurstTimeoutRef.current = window.setTimeout(() => {
+            setSecondChanceWinBurstActive(false);
+          }, 1100);
+        } else {
+          setSecondChanceWinBurstActive(false);
+        }
+        void load();
       }, 3400);
       setSaving(false);
     }
@@ -678,8 +714,8 @@ export default function DailyGoalsPage({ userId }: Props) {
   const rewardCard = (
     <div className="card stack">
       <div style={{ fontWeight: 700 }}>Reward Spin</div>
-      <div className="goal-wheel-wrap">
-        <div className="goal-wheel-pointer" />
+      <div className={`goal-wheel-wrap ${winBurstActive ? "is-win-burst" : ""}`}>
+        <div className={`goal-wheel-pointer ${wheelSpinning ? "is-ticking" : ""}`} />
         <div
           className={`goal-wheel ${wheelSpinning ? "is-spinning" : ""}`}
           style={{
@@ -701,6 +737,16 @@ export default function DailyGoalsPage({ userId }: Props) {
             {wheelSpinning ? "..." : canSpinToday ? "SPIN" : "LOCKED"}
           </button>
         </div>
+        {winBurstActive && (
+          <>
+            <span className="goal-confetti goal-confetti-1" />
+            <span className="goal-confetti goal-confetti-2" />
+            <span className="goal-confetti goal-confetti-3" />
+            <span className="goal-confetti goal-confetti-4" />
+            <span className="goal-confetti goal-confetti-5" />
+            <span className="goal-confetti goal-confetti-6" />
+          </>
+        )}
       </div>
       {!rewardSettings && (
         <div className="item-sub">Set up a reward in Goals Setup to enable spinning.</div>
@@ -751,7 +797,9 @@ export default function DailyGoalsPage({ userId }: Props) {
         Using second chance locks today's checklists. If you are still close to the main threshold,
         you may want to finish goals first.
       </div>
-      <div className="goal-wheel-wrap goal-wheel-wrap-bonus">
+      <div
+        className={`goal-wheel-wrap goal-wheel-wrap-bonus ${secondChanceWinBurstActive ? "is-win-burst" : ""}`}
+      >
         <div
           className={`goal-wheel-pointer goal-wheel-pointer-bonus ${secondChanceSpinning ? "is-ticking" : ""}`}
         />
@@ -776,6 +824,16 @@ export default function DailyGoalsPage({ userId }: Props) {
             {secondChanceSpinning ? "..." : canUseSecondChanceToday ? "TRY" : "LOCKED"}
           </button>
         </div>
+        {secondChanceWinBurstActive && (
+          <>
+            <span className="goal-confetti goal-confetti-1" />
+            <span className="goal-confetti goal-confetti-2" />
+            <span className="goal-confetti goal-confetti-3" />
+            <span className="goal-confetti goal-confetti-4" />
+            <span className="goal-confetti goal-confetti-5" />
+            <span className="goal-confetti goal-confetti-6" />
+          </>
+        )}
       </div>
       <div className="goal-wheel-legend">
         <span className="goal-wheel-legend-win">
