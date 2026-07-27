@@ -251,6 +251,23 @@ export async function getGoalDailyNoteByDate(params: {
   return (data as GoalDailyNote | null) ?? null;
 }
 
+export async function listGoalDailyNotesRange(params: {
+  user_id: string;
+  start_local_date: string;
+  end_local_date: string;
+}): Promise<GoalDailyNote[]> {
+  const { data, error } = await supabase
+    .from("goal_daily_notes")
+    .select("*")
+    .eq("user_id", params.user_id)
+    .gte("local_date", params.start_local_date)
+    .lte("local_date", params.end_local_date)
+    .order("local_date", { ascending: false })
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as GoalDailyNote[];
+}
+
 export async function upsertGoalDailyNote(input: {
   user_id: string;
   occurred_at: string;

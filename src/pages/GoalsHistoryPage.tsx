@@ -12,6 +12,7 @@ import {
 } from "../api/goalRewards";
 import {
   listGoalDailyItemProgressRange,
+  listGoalDailyNotesRange,
   listGoalDailyProgressRange,
   listGoalTemplatesWithItems,
 } from "../api/goals";
@@ -146,6 +147,9 @@ export default function GoalsHistoryPage({ userId }: Props) {
   const [itemProgressRows, setItemProgressRows] = useState<
     Awaited<ReturnType<typeof listGoalDailyItemProgressRange>>
   >([]);
+  const [noteRows, setNoteRows] = useState<Awaited<ReturnType<typeof listGoalDailyNotesRange>>>(
+    [],
+  );
   const [attemptRows, setAttemptRows] = useState<
     Awaited<ReturnType<typeof listGoalRewardAttemptsRange>>
   >([]);
@@ -167,6 +171,7 @@ export default function GoalsHistoryPage({ userId }: Props) {
         templateData,
         progressData,
         itemProgressData,
+        noteData,
         rewardData,
         secondChanceData,
         availableCount,
@@ -180,6 +185,11 @@ export default function GoalsHistoryPage({ userId }: Props) {
           end_local_date: endDate,
         }),
         listGoalDailyItemProgressRange({
+          user_id: userId,
+          start_local_date: startDate,
+          end_local_date: endDate,
+        }),
+        listGoalDailyNotesRange({
           user_id: userId,
           start_local_date: startDate,
           end_local_date: endDate,
@@ -201,6 +211,7 @@ export default function GoalsHistoryPage({ userId }: Props) {
       setTemplates(templateData);
       setProgressRows(progressData);
       setItemProgressRows(itemProgressData);
+      setNoteRows(noteData);
       setAttemptRows(rewardData);
       setSecondChanceRows(secondChanceData);
       setAvailableRewards(availableCount);
@@ -237,6 +248,7 @@ export default function GoalsHistoryPage({ userId }: Props) {
   const rowsByDate = useMemo(() => {
     const progressByDate: Record<string, ReturnType<typeof keyByTemplateId>> = {};
     const itemByDate: Record<string, ReturnType<typeof keyByTemplateItemId>> = {};
+    const notesByDate: Record<string, (typeof noteRows)[number]> = {};
     const attemptsByDate: Record<string, (typeof attemptRows)[number]> = {};
     const secondChanceByDate: Record<string, (typeof secondChanceRows)[number]> = {};
 
@@ -247,6 +259,10 @@ export default function GoalsHistoryPage({ userId }: Props) {
       itemByDate[date] = keyByTemplateItemId(dayItemProgress);
     });
 
+    noteRows.forEach((note) => {
+      notesByDate[note.local_date] = note;
+    });
+
     attemptRows.forEach((attempt) => {
       attemptsByDate[attempt.local_date] = attempt;
     });
@@ -254,8 +270,8 @@ export default function GoalsHistoryPage({ userId }: Props) {
       secondChanceByDate[attempt.local_date] = attempt;
     });
 
-    return { progressByDate, itemByDate, attemptsByDate, secondChanceByDate };
-  }, [allDatesWindow, progressRows, itemProgressRows, attemptRows, secondChanceRows]);
+    return { progressByDate, itemByDate, notesByDate, attemptsByDate, secondChanceByDate };
+  }, [allDatesWindow, progressRows, itemProgressRows, noteRows, attemptRows, secondChanceRows]);
 
   const summaryByDate = useMemo(() => {
     const mapped: Record<string, ReturnType<typeof summarizeDay>> = {};
@@ -360,6 +376,7 @@ export default function GoalsHistoryPage({ userId }: Props) {
       const summary = summaryByDate[date];
       return (
         (summary?.total ?? 0) > 0 ||
+        Boolean(rowsByDate.notesByDate[date]) ||
         Boolean(rowsByDate.attemptsByDate[date]) ||
         Boolean(rowsByDate.secondChanceByDate[date])
       );
@@ -730,6 +747,7 @@ export default function GoalsHistoryPage({ userId }: Props) {
             summaryByDate[date] ?? summarizeDay(templates, dayProgress, dayItemProgress, date);
           const attempt = rowsByDate.attemptsByDate[date] ?? null;
           const secondChance = rowsByDate.secondChanceByDate[date] ?? null;
+          const note = rowsByDate.notesByDate[date] ?? null;
           const label = DateTime.fromISO(date).toFormat("ccc, LLL d");
           const hasBankedToken = bankedSpinDates.includes(date);
 
@@ -763,6 +781,11 @@ export default function GoalsHistoryPage({ userId }: Props) {
                       ? "SPIN WIN (+1 token)"
                       : "SPIN MISS"
                     : `BANKED +${secondChance.awarded_fraction.toFixed(2)} token`}
+                </div>
+              )}
+              {note && (
+                <div className="item-sub" style={{ whiteSpace: "pre-wrap" }}>
+                  Note: {note.note_text}
                 </div>
               )}
               <div className="divider" />
