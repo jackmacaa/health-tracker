@@ -217,7 +217,8 @@ export default function DailyGoalsPage({ userId }: Props) {
         }
 
         template.items.forEach((item) => {
-          nextItemChecks[item.id] = itemProgressByItemIdFromLoad[item.id]?.checked ?? item.default_checked;
+          nextItemChecks[item.id] =
+            itemProgressByItemIdFromLoad[item.id]?.checked ?? item.default_checked;
         });
       });
 
@@ -316,7 +317,14 @@ export default function DailyGoalsPage({ userId }: Props) {
     });
 
     return count;
-  }, [templates, progressByTemplateId, itemProgressByItemId, numberDrafts, draftTemplateChecks, draftItemChecks]);
+  }, [
+    templates,
+    progressByTemplateId,
+    itemProgressByItemId,
+    numberDrafts,
+    draftTemplateChecks,
+    draftItemChecks,
+  ]);
 
   const hasPendingGoalChanges = pendingGoalChangeCount > 0;
 
@@ -363,7 +371,8 @@ export default function DailyGoalsPage({ userId }: Props) {
   );
   const allGoalsCompleted = summary.total > 0 && summary.done;
 
-  const canSpinToday = Boolean(rewardSettings) && eligibleForReward && !rewardAttempt && !hasPendingGoalChanges;
+  const canSpinToday =
+    Boolean(rewardSettings) && eligibleForReward && !rewardAttempt && !hasPendingGoalChanges;
   const canUseSecondChanceToday =
     Boolean(rewardSettings?.second_chance_enabled) &&
     secondChanceEligible &&
@@ -764,7 +773,8 @@ export default function DailyGoalsPage({ userId }: Props) {
           }
 
           if (template.goal_kind === "checkbox" && template.items.length === 0) {
-            const persistedChecked = progressByTemplateId[template.id]?.checked ?? template.default_checked;
+            const persistedChecked =
+              progressByTemplateId[template.id]?.checked ?? template.default_checked;
             const draftChecked = draftTemplateChecks[template.id] ?? persistedChecked;
             if (draftChecked !== persistedChecked) {
               const saved = await upsertGoalDailyProgress({
@@ -789,7 +799,8 @@ export default function DailyGoalsPage({ userId }: Props) {
 
           if (template.goal_kind === "checkbox" && template.items.length > 0) {
             const changedItems = template.items.filter((item) => {
-              const persistedChecked = itemProgressByItemId[item.id]?.checked ?? item.default_checked;
+              const persistedChecked =
+                itemProgressByItemId[item.id]?.checked ?? item.default_checked;
               const draftChecked = draftItemChecks[item.id] ?? persistedChecked;
               return draftChecked !== persistedChecked;
             });
@@ -822,7 +833,9 @@ export default function DailyGoalsPage({ userId }: Props) {
               }),
             );
 
-            const finalAllDone = template.items.every((item) => draftItemChecks[item.id] ?? item.default_checked);
+            const finalAllDone = template.items.every(
+              (item) => draftItemChecks[item.id] ?? item.default_checked,
+            );
             const savedTemplate = await upsertGoalDailyProgress({
               user_id: userId,
               template_id: template.id,
@@ -888,8 +901,8 @@ export default function DailyGoalsPage({ userId }: Props) {
           : hasPendingGoalChanges
             ? "Save your goal changes first."
             : eligibleForReward
-            ? "Today's spin is unlocked. Press the wheel center to spin now."
-            : "Complete more goals to unlock today's spin."
+              ? "Today's spin is unlocked. Press the wheel center to spin now."
+              : "Complete more goals to unlock today's spin."
       }
     >
       {!rewardSettings && (
@@ -966,8 +979,8 @@ export default function DailyGoalsPage({ userId }: Props) {
           : hasPendingGoalChanges
             ? "Save your goal changes first."
             : canUseSecondChanceToday
-            ? "You unlocked second chance. Spin for +1 token or bank the expected value now."
-            : "Unlock by reaching second chance threshold and completing required goals."
+              ? "You unlocked second chance. Spin for +1 token or bank the expected value now."
+              : "Unlock by reaching second chance threshold and completing required goals."
       }
     >
       <div className="row" style={{ gap: "8px" }}>
@@ -1034,11 +1047,7 @@ export default function DailyGoalsPage({ userId }: Props) {
           >
             Required: {summary.requiredCompleted}/{summary.requiredTotal}
           </div>
-          <div
-            className="goal-pill goal-pill-success"
-          >
-            Fully editable
-          </div>
+          <div className="goal-pill goal-pill-success">Fully editable</div>
         </div>
       </div>
 
@@ -1156,7 +1165,8 @@ export default function DailyGoalsPage({ userId }: Props) {
               {template.goal_kind === "checkbox" && template.items.length > 0 && (
                 <div className="chips">
                   {template.items.map((item) => {
-                    const checked = displayItemProgressByItemId[item.id]?.checked ?? item.default_checked;
+                    const checked =
+                      displayItemProgressByItemId[item.id]?.checked ?? item.default_checked;
                     return (
                       <button
                         key={item.id}
