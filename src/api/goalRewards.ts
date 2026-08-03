@@ -285,6 +285,20 @@ function isEligible(params: {
   return completionPercent >= thresholdValue;
 }
 
+function resolveOccurredAtForLocalDate(input: {
+  occurred_at?: string;
+  local_date?: string;
+  tz_offset_minutes: number;
+}) {
+  if (!input.local_date) {
+    return input.occurred_at ?? DateTime.utc().toISO({ suppressMilliseconds: true })!;
+  }
+
+  return DateTime.fromISO(`${input.local_date}T12:00:00`, { zone: "utc" })
+    .minus({ minutes: input.tz_offset_minutes })
+    .toISO({ suppressMilliseconds: true })!;
+}
+
 export async function spinGoalRewardForToday(input: {
   user_id: string;
   tz_offset_minutes: number;
@@ -298,7 +312,7 @@ export async function spinGoalRewardForToday(input: {
   total_goal_count: number;
   required_goals_completed?: boolean;
 }): Promise<GoalRewardAttempt> {
-  const occurredAt = input.occurred_at ?? DateTime.utc().toISO({ suppressMilliseconds: true })!;
+  const occurredAt = resolveOccurredAtForLocalDate(input);
   const localDate =
     input.local_date ??
     DateTime.fromISO(occurredAt, { zone: "utc" })

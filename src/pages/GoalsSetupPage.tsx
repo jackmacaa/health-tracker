@@ -8,6 +8,7 @@ import {
 } from "../api/goals";
 import { getGoalRewardSettings, upsertGoalRewardSettings } from "../api/goalRewards";
 import { playWheelSound, startWheelTickTrack } from "../lib/wheelFx";
+import SpinWheelCard from "../components/SpinWheelCard";
 import type { GoalTemplate, RewardThresholdMode } from "../types";
 
 interface Props {
@@ -216,11 +217,6 @@ export default function GoalsSetupPage({ userId }: Props) {
     [previewChancePercent, previewSegmentCount],
   );
 
-  const previewWheelGradient = useMemo(
-    () => buildWheelGradient(previewWheelSectors),
-    [previewWheelSectors],
-  );
-
   const secondPreviewChancePercent = useMemo(() => {
     const parsed = Number(secondChanceChancePercent);
     if (!Number.isFinite(parsed)) return 0;
@@ -230,15 +226,6 @@ export default function GoalsSetupPage({ userId }: Props) {
   const secondPreviewWheelSectors = useMemo(
     () => buildWheelSectors(secondPreviewChancePercent, previewSegmentCount),
     [secondPreviewChancePercent, previewSegmentCount],
-  );
-
-  const secondPreviewWheelGradient = useMemo(
-    () =>
-      buildAlternatingWheelGradient(secondPreviewWheelSectors, {
-        win: ["#2563eb", "#3b82f6"],
-        lose: ["#f59e0b", "#fbbf24"],
-      }),
-    [secondPreviewWheelSectors],
   );
 
   useEffect(() => {
@@ -312,12 +299,12 @@ export default function GoalsSetupPage({ userId }: Props) {
     setSecondPreviewWheelSpinning(true);
     playWheelSound("start", previewSoundOn);
     secondPreviewTickStopRef.current?.();
-    secondPreviewTickStopRef.current = startWheelTickTrack(3200, previewSoundOn);
+    secondPreviewTickStopRef.current = startWheelTickTrack(4000, previewSoundOn);
     setSecondPreviewWheelRotation((prev) => {
       const currentNormalized = ((prev % 360) + 360) % 360;
       const finalNormalized = (360 - desiredPointerAngle) % 360;
       const deltaNormalized = (finalNormalized - currentNormalized + 360) % 360;
-      const spinDegrees = 2880 + deltaNormalized;
+      const spinDegrees = 3600 + deltaNormalized;
       return prev + spinDegrees;
     });
 
@@ -343,7 +330,7 @@ export default function GoalsSetupPage({ userId }: Props) {
       } else {
         setSecondPreviewWinBurstActive(false);
       }
-    }, 3400);
+    }, 4200);
   }
 
   async function submitGoal(e: React.FormEvent) {
@@ -833,144 +820,78 @@ export default function GoalsSetupPage({ userId }: Props) {
         )}
       </div>
 
-      <div className="card stack">
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontWeight: 700 }}>Wheel Preview</div>
-          <button
-            className="btn secondary"
-            type="button"
-            onClick={() => setShowMainPreviewSection((value) => !value)}
-          >
-            {showMainPreviewSection ? "Hide" : "Show"}
-          </button>
-        </div>
-        {showMainPreviewSection && (
+      <SpinWheelCard
+        title="Wheel Preview"
+        description="Test the wheel with your current values above. This does not save or consume a real spin."
+        segments={previewWheelSectors}
+        colorMode="binary"
+        colors={{ win: ["#16a34a", "#22c55e"], lose: ["#ef4444", "#f97316"] }}
+        wheelRotation={previewWheelRotation}
+        wheelSpinning={previewWheelSpinning}
+        winBurstActive={previewWinBurstActive}
+        buttonLabel="SPIN"
+        buttonBusyLabel="..."
+        buttonTitle="Preview wheel spin"
+        disabled={previewWheelSpinning}
+        onClick={spinPreviewWheel}
+        legend={
           <>
-            <div className="item-sub">
-              Test the wheel with your current values above. This does not save or consume a real
-              spin.
-            </div>
-            <div className={`goal-wheel-wrap ${previewWinBurstActive ? "is-win-burst" : ""}`}>
-              <div className={`goal-wheel-pointer ${previewWheelSpinning ? "is-ticking" : ""}`} />
-              <div
-                className={`goal-wheel ${previewWheelSpinning ? "is-spinning" : ""}`}
-                style={{
-                  transform: `rotate(${previewWheelRotation}deg)`,
-                  background: previewWheelGradient,
-                }}
-              >
-                <button
-                  className="goal-wheel-center"
-                  type="button"
-                  disabled={previewWheelSpinning}
-                  onClick={spinPreviewWheel}
-                >
-                  {previewWheelSpinning ? "..." : "SPIN"}
-                </button>
-              </div>
-              {previewWinBurstActive && (
-                <>
-                  <span className="goal-confetti goal-confetti-1" />
-                  <span className="goal-confetti goal-confetti-2" />
-                  <span className="goal-confetti goal-confetti-3" />
-                  <span className="goal-confetti goal-confetti-4" />
-                  <span className="goal-confetti goal-confetti-5" />
-                  <span className="goal-confetti goal-confetti-6" />
-                </>
-              )}
-            </div>
-            <div className="goal-wheel-legend">
-              <span className="goal-wheel-legend-win">
-                Win zone: {previewChancePercent.toFixed(1)}%
-              </span>
-              <span className="goal-wheel-legend-miss">
-                Miss zone: {(100 - previewChancePercent).toFixed(1)}%
-              </span>
-              <span className="goal-wheel-legend-miss">Segments: {previewSegmentCount}</span>
-              <button
-                className="btn secondary"
-                type="button"
-                onClick={() => setPreviewSoundOn((value) => !value)}
-              >
-                Sound: {previewSoundOn ? "On" : "Off"}
-              </button>
-            </div>
-            {previewResult && <div className="goal-attempt-box">{previewResult}</div>}
-          </>
-        )}
-      </div>
-
-      <div className="card stack">
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontWeight: 700 }}>Second Chance Wheel Preview</div>
-          <button
-            className="btn secondary"
-            type="button"
-            onClick={() => setShowSecondPreviewSection((value) => !value)}
-          >
-            {showSecondPreviewSection ? "Hide" : "Show"}
-          </button>
-        </div>
-        {showSecondPreviewSection && (
-          <>
-            <div className="item-sub">
-              Preview the second chance spinner separately. It uses the second chance chance
-              percent.
-            </div>
-            <div
-              className={`goal-wheel-wrap goal-wheel-wrap-bonus ${secondPreviewWinBurstActive ? "is-win-burst" : ""}`}
+            <span className="goal-wheel-legend-win">
+              Win zone: {previewChancePercent.toFixed(1)}%
+            </span>
+            <span className="goal-wheel-legend-miss">
+              Miss zone: {(100 - previewChancePercent).toFixed(1)}%
+            </span>
+            <span className="goal-wheel-legend-miss">Segments: {previewSegmentCount}</span>
+            <button
+              className="btn secondary"
+              type="button"
+              onClick={() => setPreviewSoundOn((value) => !value)}
             >
-              <div
-                className={`goal-wheel-pointer goal-wheel-pointer-bonus ${secondPreviewWheelSpinning ? "is-ticking" : ""}`}
-              />
-              <div
-                className={`goal-wheel goal-wheel-bonus ${secondPreviewWheelSpinning ? "is-spinning" : ""}`}
-                style={{
-                  transform: `rotate(${secondPreviewWheelRotation}deg)`,
-                  background: secondPreviewWheelGradient,
-                }}
-              >
-                <button
-                  className="goal-wheel-center goal-wheel-center-bonus"
-                  type="button"
-                  disabled={secondPreviewWheelSpinning || !secondChanceEnabled}
-                  onClick={spinSecondChancePreviewWheel}
-                >
-                  {secondPreviewWheelSpinning ? "..." : "TRY"}
-                </button>
-              </div>
-              {secondPreviewWinBurstActive && (
-                <>
-                  <span className="goal-confetti goal-confetti-1" />
-                  <span className="goal-confetti goal-confetti-2" />
-                  <span className="goal-confetti goal-confetti-3" />
-                  <span className="goal-confetti goal-confetti-4" />
-                  <span className="goal-confetti goal-confetti-5" />
-                  <span className="goal-confetti goal-confetti-6" />
-                </>
-              )}
-            </div>
-            <div className="goal-wheel-legend">
-              <span className="goal-wheel-legend-win">
-                Win zone: {secondPreviewChancePercent.toFixed(1)}%
-              </span>
-              <span className="goal-wheel-legend-miss">
-                Miss zone: {(100 - secondPreviewChancePercent).toFixed(1)}%
-              </span>
-              <span className="goal-wheel-legend-miss">Segments: {previewSegmentCount}</span>
-              <span className="goal-wheel-legend-miss">
-                Bank value: {(secondPreviewChancePercent / 100).toFixed(2)} token
-              </span>
-            </div>
-            {!secondChanceEnabled && (
-              <div className="goal-attempt-box">
-                Enable second chance in Reward Settings to test this preview.
-              </div>
-            )}
-            {secondPreviewResult && <div className="goal-attempt-box">{secondPreviewResult}</div>}
+              Sound: {previewSoundOn ? "On" : "Off"}
+            </button>
           </>
-        )}
-      </div>
+        }
+        footer={previewResult ?? "Press spin to preview the configured wheel."}
+      />
+
+      <SpinWheelCard
+        title="Second Chance Wheel Preview"
+        description="Preview the second chance spinner separately. It uses the second chance chance percent."
+        segments={secondPreviewWheelSectors}
+        colorMode="binary"
+        colors={{ win: ["#2563eb", "#3b82f6"], lose: ["#f59e0b", "#fbbf24"] }}
+        wheelRotation={secondPreviewWheelRotation}
+        wheelSpinning={secondPreviewWheelSpinning}
+        winBurstActive={secondPreviewWinBurstActive}
+        pointerClassName="goal-wheel-pointer-bonus"
+        wheelClassName="goal-wheel-bonus"
+        centerClassName="goal-wheel-center-bonus"
+        buttonLabel="TRY"
+        buttonBusyLabel="..."
+        buttonTitle="Preview second chance spin"
+        disabled={secondPreviewWheelSpinning || !secondChanceEnabled}
+        onClick={spinSecondChancePreviewWheel}
+        legend={
+          <>
+            <span className="goal-wheel-legend-win">
+              Win zone: {secondPreviewChancePercent.toFixed(1)}%
+            </span>
+            <span className="goal-wheel-legend-miss">
+              Miss zone: {(100 - secondPreviewChancePercent).toFixed(1)}%
+            </span>
+            <span className="goal-wheel-legend-miss">Segments: {previewSegmentCount}</span>
+            <span className="goal-wheel-legend-miss">
+              Bank value: {(secondPreviewChancePercent / 100).toFixed(2)} token
+            </span>
+          </>
+        }
+        footer={
+          !secondChanceEnabled
+            ? "Enable second chance in Reward Settings to test this preview."
+            : (secondPreviewResult ?? "Press spin to preview the second chance wheel.")
+        }
+      />
 
       <div className="card stack">
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>

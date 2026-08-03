@@ -20,6 +20,7 @@ import {
 } from "../api/goals";
 import { tzOffsetNowMinutes } from "../lib/date";
 import { playWheelSound, startWheelTickTrack } from "../lib/wheelFx";
+import SpinWheelCard from "../components/SpinWheelCard";
 import type { GoalRewardAttempt, GoalSecondChanceAttempt } from "../types";
 import {
   occurredAtNoonUtc,
@@ -154,6 +155,8 @@ export default function DailyGoalsPage({ userId }: Props) {
     null,
   );
   const [numberDrafts, setNumberDrafts] = useState<Record<string, string>>({});
+  const [draftTemplateChecks, setDraftTemplateChecks] = useState<Record<string, boolean>>({});
+  const [draftItemChecks, setDraftItemChecks] = useState<Record<string, boolean>>({});
   const [dailyNoteDraft, setDailyNoteDraft] = useState("");
   const [dailyNoteSaved, setDailyNoteSaved] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
@@ -194,7 +197,33 @@ export default function DailyGoalsPage({ userId }: Props) {
       setSecondChanceAttempt(secondChance);
       setDailyNoteDraft(note?.note_text ?? "");
       setDailyNoteSaved(note?.note_text ?? "");
-      setNumberDrafts({});
+
+      const nextNumberDrafts: Record<string, string> = {};
+      const nextTemplateChecks: Record<string, boolean> = {};
+      const nextItemChecks: Record<string, boolean> = {};
+
+      const progressByTemplateIdFromLoad = keyByTemplateId(progress);
+      const itemProgressByItemIdFromLoad = keyByTemplateItemId(itemProgress);
+
+      templateRows.forEach((template) => {
+        const templateProgress = progressByTemplateIdFromLoad[template.id];
+
+        if (template.goal_kind === "number") {
+          nextNumberDrafts[template.id] = String(templateProgress?.numeric_value ?? 0);
+        }
+
+        if (template.goal_kind === "checkbox" && template.items.length === 0) {
+          nextTemplateChecks[template.id] = templateProgress?.checked ?? template.default_checked;
+        }
+
+        template.items.forEach((item) => {
+          nextItemChecks[item.id] = itemProgressByItemIdFromLoad[item.id]?.checked ?? item.default_checked;
+        });
+      });
+
+      setNumberDrafts(nextNumberDrafts);
+      setDraftTemplateChecks(nextTemplateChecks);
+      setDraftItemChecks(nextItemChecks);
     } catch (e: any) {
       setError(e.message ?? String(e));
     } finally {
@@ -212,9 +241,88 @@ export default function DailyGoalsPage({ userId }: Props) {
     [itemProgressRows],
   );
 
+  const displayProgressByTemplateId = useMemo(() => {
+    const next: typeof progressByTemplateId = { ...progressByTemplateId };
+
+    templates.forEach((template) => {
+      if (template.goal_kind === "number") {
+        const draftValue = numberDrafts[template.id];
+        if (draftValue !== undefined) {
+          next[template.id] = {
+            ...(next[template.id] ?? {}),
+            numeric_value: draftValue === "" ? null : Number(draftValue),
+          } as any;
+        }
+      }
+
+      if (template.goal_kind === "checkbox" && template.items.length === 0) {
+        const draftChecked = draftTemplateChecks[template.id];
+        if (draftChecked !== undefined) {
+          next[template.id] = {
+            ...(next[template.id] ?? {}),
+            checked: draftChecked,
+          } as any;
+        }
+      }
+    });
+
+    return next;
+  }, [progressByTemplateId, templates, numberDrafts, draftTemplateChecks]);
+
+  const displayItemProgressByItemId = useMemo(() => {
+    const next: typeof itemProgressByItemId = { ...itemProgressByItemId };
+
+    templates.forEach((template) => {
+      template.items.forEach((item) => {
+        const draftChecked = draftItemChecks[item.id];
+        if (draftChecked !== undefined) {
+          next[item.id] = {
+            ...(next[item.id] ?? {}),
+            checked: draftChecked,
+          } as any;
+        }
+      });
+    });
+
+    return next;
+  }, [itemProgressByItemId, templates, draftItemChecks]);
+
+  const pendingGoalChangeCount = useMemo(() => {
+    let count = 0;
+
+    templates.forEach((template) => {
+      const persistedProgress = progressByTemplateId[template.id];
+
+      if (template.goal_kind === "number") {
+        const persistedValue = String(persistedProgress?.numeric_value ?? 0);
+        if ((numberDrafts[template.id] ?? persistedValue) !== persistedValue) {
+          count += 1;
+        }
+      }
+
+      if (template.goal_kind === "checkbox" && template.items.length === 0) {
+        const persistedChecked = persistedProgress?.checked ?? template.default_checked;
+        if ((draftTemplateChecks[template.id] ?? persistedChecked) !== persistedChecked) {
+          count += 1;
+        }
+      }
+
+      template.items.forEach((item) => {
+        const persistedChecked = itemProgressByItemId[item.id]?.checked ?? item.default_checked;
+        if ((draftItemChecks[item.id] ?? persistedChecked) !== persistedChecked) {
+          count += 1;
+        }
+      });
+    });
+
+    return count;
+  }, [templates, progressByTemplateId, itemProgressByItemId, numberDrafts, draftTemplateChecks, draftItemChecks]);
+
+  const hasPendingGoalChanges = pendingGoalChangeCount > 0;
+
   const summary = useMemo(
-    () => summarizeDay(templates, progressByTemplateId, itemProgressByItemId),
-    [templates, progressByTemplateId, itemProgressByItemId],
+    () => summarizeDay(templates, displayProgressByTemplateId, displayItemProgressByItemId),
+    [templates, displayProgressByTemplateId, displayItemProgressByItemId],
   );
 
   const eligibleForReward = useMemo(
@@ -245,7 +353,6 @@ export default function DailyGoalsPage({ userId }: Props) {
     () => buildWheelSectors(chancePercent, wheelSegmentCount),
     [chancePercent, wheelSegmentCount],
   );
-  const wheelGradient = useMemo(() => buildWheelGradient(wheelSectors), [wheelSectors]);
   const secondChanceChancePercent = Math.max(
     0,
     Math.min(100, rewardSettings?.second_chance_chance_percent ?? 10),
@@ -254,20 +361,14 @@ export default function DailyGoalsPage({ userId }: Props) {
     () => buildWheelSectors(secondChanceChancePercent, wheelSegmentCount),
     [secondChanceChancePercent, wheelSegmentCount],
   );
-  const secondChanceGradient = useMemo(
-    () =>
-      buildAlternatingWheelGradient(secondChanceSectors, {
-        win: ["#2563eb", "#3b82f6"],
-        lose: ["#f59e0b", "#fbbf24"],
-      }),
-    [secondChanceSectors],
-  );
   const allGoalsCompleted = summary.total > 0 && summary.done;
 
-  const isChecklistLocked = rewardAttempt != null || secondChanceAttempt != null;
-  const canSpinToday = Boolean(rewardSettings) && eligibleForReward && !rewardAttempt;
+  const canSpinToday = Boolean(rewardSettings) && eligibleForReward && !rewardAttempt && !hasPendingGoalChanges;
   const canUseSecondChanceToday =
-    Boolean(rewardSettings?.second_chance_enabled) && secondChanceEligible && !secondChanceAttempt;
+    Boolean(rewardSettings?.second_chance_enabled) &&
+    secondChanceEligible &&
+    !secondChanceAttempt &&
+    !hasPendingGoalChanges;
   const secondChanceLockReason = useMemo(() => {
     if (!rewardSettings?.second_chance_enabled) {
       return "Enable second chance in Goals Setup.";
@@ -560,27 +661,8 @@ export default function DailyGoalsPage({ userId }: Props) {
     }
   }
 
-  async function saveCheckboxTemplate(templateId: string, checked: boolean) {
-    if (isChecklistLocked) return;
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      await upsertGoalDailyProgress({
-        user_id: userId,
-        template_id: templateId,
-        occurred_at: occurredAtNoonUtc(localDate),
-        tz_offset_minutes: tzOffsetNowMinutes(),
-        checked,
-        numeric_value: null,
-      });
-      setSuccess("Saved.");
-      await load();
-    } catch (e: any) {
-      setError(e.message ?? String(e));
-    } finally {
-      setSaving(false);
-    }
+  function updateTemplateCheckedDraft(templateId: string, checked: boolean) {
+    setDraftTemplateChecks((current) => ({ ...current, [templateId]: checked }));
   }
 
   async function saveDailyNote() {
@@ -635,75 +717,135 @@ export default function DailyGoalsPage({ userId }: Props) {
     }
   }
 
-  async function saveNumberTemplate(templateId: string, value: number | null) {
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const saved = await upsertGoalDailyProgress({
-        user_id: userId,
-        template_id: templateId,
-        occurred_at: occurredAtNoonUtc(localDate),
-        tz_offset_minutes: tzOffsetNowMinutes(),
-        checked: false,
-        numeric_value: value,
-      });
-
-      setProgressRows((current) => {
-        const index = current.findIndex((row) => row.template_id === templateId);
-        if (index < 0) return [...current, saved];
-        const next = [...current];
-        next[index] = saved;
-        return next;
-      });
-      setNumberDrafts((current) => {
-        const { [templateId]: _, ...rest } = current;
-        return rest;
-      });
-      setSuccess("Saved.");
-    } catch (e: any) {
-      setError(e.message ?? String(e));
-    } finally {
-      setSaving(false);
-    }
+  function updateNumberDraft(templateId: string, value: string) {
+    setNumberDrafts((current) => ({ ...current, [templateId]: value }));
   }
 
-  async function toggleChecklistItem(templateId: string, itemId: string, checked: boolean) {
-    if (isChecklistLocked) return;
+  function updateItemCheckedDraft(itemId: string, checked: boolean) {
+    setDraftItemChecks((current) => ({ ...current, [itemId]: checked }));
+  }
+
+  async function saveGoalDrafts() {
+    if (!hasPendingGoalChanges) return;
+
     setSaving(true);
     setError(null);
     setSuccess(null);
+
     try {
-      const occurredAt = occurredAtNoonUtc(localDate);
-      const tzOffset = tzOffsetNowMinutes();
-      await upsertGoalDailyItemProgress({
-        user_id: userId,
-        template_item_id: itemId,
-        occurred_at: occurredAt,
-        tz_offset_minutes: tzOffset,
-        checked,
-      });
+      const updatedTemplates = new Set<string>();
+      const updatedItems = new Set<string>();
 
-      const template = templates.find((row) => row.id === templateId);
-      const nextItemMap = { ...itemProgressByItemId, [itemId]: { checked } as any };
-      const allDone =
-        template?.items.length &&
-        template.items.every((item) => {
-          if (item.id === itemId) return checked;
-          return nextItemMap[item.id]?.checked ?? item.default_checked;
-        });
+      await Promise.all(
+        templates.map(async (template) => {
+          if (template.goal_kind === "number") {
+            const persistedValue = progressByTemplateId[template.id]?.numeric_value ?? 0;
+            const draftValue = numberDrafts[template.id] ?? String(persistedValue);
+            const parsedValue = draftValue === "" ? null : Number(draftValue);
+            if (String(parsedValue ?? 0) !== String(persistedValue ?? 0)) {
+              const saved = await upsertGoalDailyProgress({
+                user_id: userId,
+                template_id: template.id,
+                occurred_at: occurredAtNoonUtc(localDate),
+                tz_offset_minutes: tzOffsetNowMinutes(),
+                checked: false,
+                numeric_value: parsedValue,
+              });
+              updatedTemplates.add(template.id);
+              setProgressRows((current) => {
+                const index = current.findIndex((row) => row.template_id === template.id);
+                if (index < 0) return [...current, saved];
+                const next = [...current];
+                next[index] = saved;
+                return next;
+              });
+            }
+            return;
+          }
 
-      await upsertGoalDailyProgress({
-        user_id: userId,
-        template_id: templateId,
-        occurred_at: occurredAt,
-        tz_offset_minutes: tzOffset,
-        checked: Boolean(allDone),
-        numeric_value: null,
-      });
+          if (template.goal_kind === "checkbox" && template.items.length === 0) {
+            const persistedChecked = progressByTemplateId[template.id]?.checked ?? template.default_checked;
+            const draftChecked = draftTemplateChecks[template.id] ?? persistedChecked;
+            if (draftChecked !== persistedChecked) {
+              const saved = await upsertGoalDailyProgress({
+                user_id: userId,
+                template_id: template.id,
+                occurred_at: occurredAtNoonUtc(localDate),
+                tz_offset_minutes: tzOffsetNowMinutes(),
+                checked: draftChecked,
+                numeric_value: null,
+              });
+              updatedTemplates.add(template.id);
+              setProgressRows((current) => {
+                const index = current.findIndex((row) => row.template_id === template.id);
+                if (index < 0) return [...current, saved];
+                const next = [...current];
+                next[index] = saved;
+                return next;
+              });
+            }
+            return;
+          }
 
-      setSuccess("Saved.");
-      await load();
+          if (template.goal_kind === "checkbox" && template.items.length > 0) {
+            const changedItems = template.items.filter((item) => {
+              const persistedChecked = itemProgressByItemId[item.id]?.checked ?? item.default_checked;
+              const draftChecked = draftItemChecks[item.id] ?? persistedChecked;
+              return draftChecked !== persistedChecked;
+            });
+
+            if (changedItems.length === 0) {
+              return;
+            }
+
+            const occurredAt = occurredAtNoonUtc(localDate);
+            const tzOffset = tzOffsetNowMinutes();
+
+            await Promise.all(
+              changedItems.map(async (item) => {
+                const draftChecked = draftItemChecks[item.id] ?? false;
+                const savedItem = await upsertGoalDailyItemProgress({
+                  user_id: userId,
+                  template_item_id: item.id,
+                  occurred_at: occurredAt,
+                  tz_offset_minutes: tzOffset,
+                  checked: draftChecked,
+                });
+                updatedItems.add(item.id);
+                setItemProgressRows((current) => {
+                  const index = current.findIndex((row) => row.template_item_id === item.id);
+                  if (index < 0) return [...current, savedItem];
+                  const next = [...current];
+                  next[index] = savedItem;
+                  return next;
+                });
+              }),
+            );
+
+            const finalAllDone = template.items.every((item) => draftItemChecks[item.id] ?? item.default_checked);
+            const savedTemplate = await upsertGoalDailyProgress({
+              user_id: userId,
+              template_id: template.id,
+              occurred_at: occurredAt,
+              tz_offset_minutes: tzOffset,
+              checked: finalAllDone,
+              numeric_value: null,
+            });
+            updatedTemplates.add(template.id);
+            setProgressRows((current) => {
+              const index = current.findIndex((row) => row.template_id === template.id);
+              if (index < 0) return [...current, savedTemplate];
+              const next = [...current];
+              next[index] = savedTemplate;
+              return next;
+            });
+          }
+        }),
+      );
+
+      if (updatedTemplates.size > 0 || updatedItems.size > 0) {
+        setSuccess("Saved.");
+      }
     } catch (e: any) {
       setError(e.message ?? String(e));
     } finally {
@@ -712,42 +854,44 @@ export default function DailyGoalsPage({ userId }: Props) {
   }
 
   const rewardCard = (
-    <div className="card stack">
-      <div style={{ fontWeight: 700 }}>Reward Spin</div>
-      <div className={`goal-wheel-wrap ${winBurstActive ? "is-win-burst" : ""}`}>
-        <div className={`goal-wheel-pointer ${wheelSpinning ? "is-ticking" : ""}`} />
-        <div
-          className={`goal-wheel ${wheelSpinning ? "is-spinning" : ""}`}
-          style={{
-            transform: `rotate(${wheelRotation}deg)`,
-            background: wheelGradient,
-          }}
-        >
-          <button
-            className="goal-wheel-center"
-            type="button"
-            disabled={saving || wheelSpinning || !canSpinToday}
-            title={
-              canSpinToday
-                ? "Spin reward wheel"
-                : "Reward spin is locked until you meet today's threshold."
-            }
-            onClick={spinTodayReward}
-          >
-            {wheelSpinning ? "..." : canSpinToday ? "SPIN" : "LOCKED"}
-          </button>
-        </div>
-        {winBurstActive && (
-          <>
-            <span className="goal-confetti goal-confetti-1" />
-            <span className="goal-confetti goal-confetti-2" />
-            <span className="goal-confetti goal-confetti-3" />
-            <span className="goal-confetti goal-confetti-4" />
-            <span className="goal-confetti goal-confetti-5" />
-            <span className="goal-confetti goal-confetti-6" />
-          </>
-        )}
-      </div>
+    <SpinWheelCard
+      title="Reward Spin"
+      segments={wheelSectors}
+      colorMode="binary"
+      colors={{ win: ["#16a34a", "#22c55e"], lose: ["#ef4444", "#f97316"] }}
+      wheelRotation={wheelRotation}
+      wheelSpinning={wheelSpinning}
+      winBurstActive={winBurstActive}
+      buttonLabel={canSpinToday ? "SPIN" : "LOCKED"}
+      buttonBusyLabel="..."
+      buttonTitle={
+        hasPendingGoalChanges
+          ? "Save your goal changes first."
+          : canSpinToday
+            ? "Spin reward wheel"
+            : "Reward spin is locked until you meet today's threshold."
+      }
+      disabled={saving || wheelSpinning || !canSpinToday}
+      onClick={spinTodayReward}
+      legend={
+        <>
+          <span className="goal-wheel-legend-win">Win zone: {chancePercent.toFixed(1)}%</span>
+          <span className="goal-wheel-legend-miss">
+            Miss zone: {(100 - chancePercent).toFixed(1)}%
+          </span>
+          <span className="goal-wheel-legend-miss">Segments: {wheelSegmentCount}</span>
+        </>
+      }
+      footer={
+        rewardAttempt
+          ? `Today's spin already used: ${rewardAttempt.did_win ? "WIN" : "MISS"}`
+          : hasPendingGoalChanges
+            ? "Save your goal changes first."
+            : eligibleForReward
+            ? "Today's spin is unlocked. Press the wheel center to spin now."
+            : "Complete more goals to unlock today's spin."
+      }
+    >
       {!rewardSettings && (
         <div className="item-sub">Set up a reward in Goals Setup to enable spinning.</div>
       )}
@@ -756,13 +900,6 @@ export default function DailyGoalsPage({ userId }: Props) {
           <div className="item-sub">
             Reward: {rewardSettings.reward_label} · Chance: {rewardSettings.chance_percent}%
           </div>
-          <div className="goal-wheel-legend">
-            <span className="goal-wheel-legend-win">Win zone: {chancePercent.toFixed(1)}%</span>
-            <span className="goal-wheel-legend-miss">
-              Miss zone: {(100 - chancePercent).toFixed(1)}%
-            </span>
-            <span className="goal-wheel-legend-miss">Segments: {wheelSegmentCount}</span>
-          </div>
           <div className="item-sub">
             Unlock rule: {rewardSettings.threshold_mode === "count" ? "count" : "percent"} ≥{" "}
             {rewardSettings.threshold_value}
@@ -770,80 +907,69 @@ export default function DailyGoalsPage({ userId }: Props) {
           <div className="item-sub">
             Required goals: {summary.requiredCompleted}/{summary.requiredTotal}
           </div>
-          {rewardAttempt ? (
-            <div className="goal-attempt-box">
-              Today's spin already used: {rewardAttempt.did_win ? "WIN" : "MISS"}
-            </div>
-          ) : (
-            <div className="goal-attempt-box">
-              {eligibleForReward
-                ? "Today's spin is unlocked. Press the wheel center to spin now."
-                : "Complete more goals to unlock today's spin."}
-            </div>
-          )}
         </>
       )}
-    </div>
+    </SpinWheelCard>
   );
 
   const secondChanceCard = rewardSettings?.second_chance_enabled && (
-    <div className="card stack">
-      <div style={{ fontWeight: 700 }}>{rewardSettings.second_chance_label}</div>
-      <div className="item-sub">
-        Finish strong mode: this unlocks when you miss the main reward threshold but still hit your
-        configured second chance threshold.
-      </div>
-      <div className="item-sub" style={{ color: "#991b1b" }}>
-        Using second chance locks today's checklists. If you are still close to the main threshold,
-        you may want to finish goals first.
-      </div>
-      <div
-        className={`goal-wheel-wrap goal-wheel-wrap-bonus ${secondChanceWinBurstActive ? "is-win-burst" : ""}`}
-      >
-        <div
-          className={`goal-wheel-pointer goal-wheel-pointer-bonus ${secondChanceSpinning ? "is-ticking" : ""}`}
-        />
-        <div
-          className={`goal-wheel goal-wheel-bonus ${secondChanceSpinning ? "is-spinning" : ""}`}
-          style={{
-            transform: `rotate(${secondChanceRotation}deg)`,
-            background: secondChanceGradient,
-          }}
-        >
-          <button
-            className="goal-wheel-center goal-wheel-center-bonus"
-            type="button"
-            disabled={saving || secondChanceSpinning || !canUseSecondChanceToday}
-            title={
-              canUseSecondChanceToday
-                ? "Spin second chance wheel"
-                : (secondChanceLockReason ?? "Second chance is not unlocked yet.")
-            }
-            onClick={spinSecondChanceToday}
-          >
-            {secondChanceSpinning ? "..." : canUseSecondChanceToday ? "TRY" : "LOCKED"}
-          </button>
-        </div>
-        {secondChanceWinBurstActive && (
-          <>
-            <span className="goal-confetti goal-confetti-1" />
-            <span className="goal-confetti goal-confetti-2" />
-            <span className="goal-confetti goal-confetti-3" />
-            <span className="goal-confetti goal-confetti-4" />
-            <span className="goal-confetti goal-confetti-5" />
-            <span className="goal-confetti goal-confetti-6" />
-          </>
-        )}
-      </div>
-      <div className="goal-wheel-legend">
-        <span className="goal-wheel-legend-win">
-          Win zone: {secondChanceChancePercent.toFixed(1)}%
-        </span>
-        <span className="goal-wheel-legend-miss">
-          Bank value: {(secondChanceChancePercent / 100).toFixed(2)} token
-        </span>
-        <span className="goal-wheel-legend-miss">Segments: {wheelSegmentCount}</span>
-      </div>
+    <SpinWheelCard
+      title={rewardSettings.second_chance_label}
+      description={
+        <>
+          Finish strong mode: this unlocks when you miss the main reward threshold but still hit
+          your configured second chance threshold.
+          <div className="item-sub" style={{ color: "#991b1b" }}>
+            Using second chance locks today's checklists. If you are still close to the main
+            threshold, you may want to finish goals first.
+          </div>
+        </>
+      }
+      segments={buildWheelSectors(secondChanceChancePercent, wheelSegmentCount)}
+      colorMode="binary"
+      colors={{ win: ["#2563eb", "#3b82f6"], lose: ["#f59e0b", "#fbbf24"] }}
+      wheelRotation={secondChanceRotation}
+      wheelSpinning={secondChanceSpinning}
+      winBurstActive={secondChanceWinBurstActive}
+      pointerClassName="goal-wheel-pointer-bonus"
+      wheelClassName="goal-wheel-bonus"
+      centerClassName="goal-wheel-center-bonus"
+      buttonLabel={canUseSecondChanceToday ? "TRY" : "LOCKED"}
+      buttonBusyLabel="..."
+      buttonTitle={
+        hasPendingGoalChanges
+          ? "Save your goal changes first."
+          : canUseSecondChanceToday
+            ? "Spin second chance wheel"
+            : (secondChanceLockReason ?? "Second chance is not unlocked yet.")
+      }
+      disabled={saving || secondChanceSpinning || !canUseSecondChanceToday}
+      onClick={spinSecondChanceToday}
+      legend={
+        <>
+          <span className="goal-wheel-legend-win">
+            Win zone: {secondChanceChancePercent.toFixed(1)}%
+          </span>
+          <span className="goal-wheel-legend-miss">
+            Bank value: {(secondChanceChancePercent / 100).toFixed(2)} token
+          </span>
+          <span className="goal-wheel-legend-miss">Segments: {wheelSegmentCount}</span>
+        </>
+      }
+      footer={
+        secondChanceAttempt
+          ? secondChanceAttempt.action === "spin"
+            ? secondChanceAttempt.did_win
+              ? "SPIN WIN (+1 token)"
+              : "SPIN MISS"
+            : `BANKED +${secondChanceAttempt.awarded_fraction.toFixed(2)} token`
+          : hasPendingGoalChanges
+            ? "Save your goal changes first."
+            : canUseSecondChanceToday
+            ? "You unlocked second chance. Spin for +1 token or bank the expected value now."
+            : "Unlock by reaching second chance threshold and completing required goals."
+      }
+    >
       <div className="row" style={{ gap: "8px" }}>
         <button
           className="btn secondary"
@@ -864,27 +990,34 @@ export default function DailyGoalsPage({ userId }: Props) {
           Locked: {secondChanceLockReason ?? "Second chance is not unlocked yet."}
         </div>
       )}
-      {secondChanceAttempt ? (
-        <div className="goal-attempt-box">
-          Today's result:{" "}
-          {secondChanceAttempt.action === "spin"
-            ? secondChanceAttempt.did_win
-              ? "SPIN WIN (+1 token)"
-              : "SPIN MISS"
-            : `BANKED +${secondChanceAttempt.awarded_fraction.toFixed(2)} token`}
-        </div>
-      ) : (
-        <div className="goal-attempt-box">
-          {canUseSecondChanceToday
-            ? "You unlocked second chance. Spin for +1 token or bank the expected value now."
-            : "Unlock by reaching second chance threshold and completing required goals."}
-        </div>
-      )}
-    </div>
+    </SpinWheelCard>
   );
 
   return (
     <div className="stack">
+      <div
+        className="card stack"
+        style={{ position: "sticky", top: "12px", zIndex: 6, gap: "12px" }}
+      >
+        <div style={{ fontWeight: 700 }}>Save Goal Changes</div>
+        <div className="item-sub">
+          {hasPendingGoalChanges
+            ? `${pendingGoalChangeCount} unsaved change${pendingGoalChangeCount === 1 ? "" : "s"}. Save before spinning.`
+            : "No unsaved goal changes."}
+        </div>
+        {hasPendingGoalChanges && (
+          <button
+            className="btn"
+            type="button"
+            disabled={saving}
+            onClick={() => void saveGoalDrafts()}
+            style={{ minHeight: "56px", width: "100%", fontSize: "1.05rem" }}
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        )}
+      </div>
+
       <div className="card stack">
         <div style={{ fontWeight: 700 }}>Daily Goals</div>
         <div className="item-sub">{DateTime.fromISO(localDate).toFormat("cccc, LLL d")}</div>
@@ -902,9 +1035,9 @@ export default function DailyGoalsPage({ userId }: Props) {
             Required: {summary.requiredCompleted}/{summary.requiredTotal}
           </div>
           <div
-            className={`goal-pill ${isChecklistLocked ? "goal-pill-fail" : "goal-pill-success"}`}
+            className="goal-pill goal-pill-success"
           >
-            {isChecklistLocked ? "Checkboxes locked after spin" : "Fully editable"}
+            Fully editable
           </div>
         </div>
       </div>
@@ -921,10 +1054,10 @@ export default function DailyGoalsPage({ userId }: Props) {
         activeTemplates.map((template) => {
           const completed = isTemplateCompleted(
             template,
-            progressByTemplateId,
-            itemProgressByItemId,
+            displayProgressByTemplateId,
+            displayItemProgressByItemId,
           );
-          const progress = progressByTemplateId[template.id];
+          const progress = displayProgressByTemplateId[template.id];
           return (
             <div className="card stack" key={template.id}>
               <div className="row" style={{ justifyContent: "space-between" }}>
@@ -960,7 +1093,7 @@ export default function DailyGoalsPage({ userId }: Props) {
                           className="btn secondary"
                           type="button"
                           disabled={saving || persistedTotal <= 0}
-                          onClick={() => void saveNumberTemplate(template.id, persistedTotal - 1)}
+                          onClick={() => updateNumberDraft(template.id, String(persistedTotal - 1))}
                         >
                           -
                         </button>
@@ -974,7 +1107,7 @@ export default function DailyGoalsPage({ userId }: Props) {
                           onChange={(e) => {
                             const next = e.target.value;
                             if (next !== "" && !/^\d+$/.test(next)) return;
-                            setNumberDrafts((current) => ({ ...current, [template.id]: next }));
+                            updateNumberDraft(template.id, next);
                           }}
                         />
                         <button
@@ -982,7 +1115,7 @@ export default function DailyGoalsPage({ userId }: Props) {
                           type="button"
                           disabled={saving}
                           onClick={() => {
-                            void saveNumberTemplate(template.id, persistedTotal + 1);
+                            updateNumberDraft(template.id, String(persistedTotal + 1));
                           }}
                         >
                           +
@@ -993,7 +1126,7 @@ export default function DailyGoalsPage({ userId }: Props) {
                           disabled={saving || !validValue || parsedValue === persistedTotal}
                           onClick={() => {
                             if (!validValue) return;
-                            void saveNumberTemplate(template.id, parsedValue);
+                            updateNumberDraft(template.id, String(parsedValue));
                           }}
                         >
                           Save
@@ -1012,8 +1145,8 @@ export default function DailyGoalsPage({ userId }: Props) {
                     <button
                       className={`btn ${checked ? "secondary" : ""}`}
                       type="button"
-                      disabled={saving || isChecklistLocked}
-                      onClick={() => saveCheckboxTemplate(template.id, !checked)}
+                      disabled={saving}
+                      onClick={() => updateTemplateCheckedDraft(template.id, !checked)}
                     >
                       {checked ? "Marked done" : "Mark done"}
                     </button>
@@ -1023,14 +1156,14 @@ export default function DailyGoalsPage({ userId }: Props) {
               {template.goal_kind === "checkbox" && template.items.length > 0 && (
                 <div className="chips">
                   {template.items.map((item) => {
-                    const checked = itemProgressByItemId[item.id]?.checked ?? item.default_checked;
+                    const checked = displayItemProgressByItemId[item.id]?.checked ?? item.default_checked;
                     return (
                       <button
                         key={item.id}
                         className={`chip ${checked ? "active" : ""}`}
                         type="button"
-                        disabled={saving || isChecklistLocked}
-                        onClick={() => toggleChecklistItem(template.id, item.id, !checked)}
+                        disabled={saving}
+                        onClick={() => updateItemCheckedDraft(item.id, !checked)}
                       >
                         {checked ? "✅" : "⬜"} {item.label}
                       </button>

@@ -18,6 +18,7 @@ import {
 } from "../api/goals";
 import { tzOffsetNowMinutes } from "../lib/date";
 import { playWheelSound, startWheelTickTrack } from "../lib/wheelFx";
+import SpinWheelCard from "../components/SpinWheelCard";
 import {
   getActiveTemplatesForDate,
   isRewardEligible,
@@ -147,9 +148,7 @@ export default function GoalsHistoryPage({ userId }: Props) {
   const [itemProgressRows, setItemProgressRows] = useState<
     Awaited<ReturnType<typeof listGoalDailyItemProgressRange>>
   >([]);
-  const [noteRows, setNoteRows] = useState<Awaited<ReturnType<typeof listGoalDailyNotesRange>>>(
-    [],
-  );
+  const [noteRows, setNoteRows] = useState<Awaited<ReturnType<typeof listGoalDailyNotesRange>>>([]);
   const [attemptRows, setAttemptRows] = useState<
     Awaited<ReturnType<typeof listGoalRewardAttemptsRange>>
   >([]);
@@ -362,7 +361,6 @@ export default function GoalsHistoryPage({ userId }: Props) {
     () => buildWheelSectors(chancePercent, wheelSegmentCount),
     [chancePercent, wheelSegmentCount],
   );
-  const wheelGradient = useMemo(() => buildWheelGradient(wheelSectors), [wheelSectors]);
 
   const canRedeem = (() => {
     const parsed = Number(redeemQuantity);
@@ -644,7 +642,7 @@ export default function GoalsHistoryPage({ userId }: Props) {
           <div className="goal-pill">
             Unredeemed fractional bank: {fractionalBankBalance.toFixed(2)}
           </div>
-          <div className="goal-pill">Banked spin tokens: {bankedSpinDates.length}</div>
+          <div className="goal-pill">Catch-up spin days: {bankedSpinDates.length}</div>
         </div>
         <div className="row" style={{ gap: "8px" }}>
           <input
@@ -670,60 +668,46 @@ export default function GoalsHistoryPage({ userId }: Props) {
         </div>
       </div>
 
-      <div className="card stack">
-        <div style={{ fontWeight: 700 }}>Spin Tokens</div>
-        <div className="item-sub">
-          Eligible days you did not spin are banked as tokens. Spin them here later.
-        </div>
-        <div className={`goal-wheel-wrap ${winBurstActive ? "is-win-burst" : ""}`}>
-          <div className={`goal-wheel-pointer ${wheelSpinning ? "is-ticking" : ""}`} />
-          <div
-            className={`goal-wheel ${wheelSpinning ? "is-spinning" : ""}`}
-            style={{
-              transform: `rotate(${wheelRotation}deg)`,
-              background: wheelGradient,
-            }}
-          >
+      <SpinWheelCard
+        title="Catch-up Spins"
+        description="These are eligible days you did not spin yet. Use them one by one, oldest first."
+        segments={wheelSectors}
+        colorMode="binary"
+        colors={{ win: ["#16a34a", "#22c55e"], lose: ["#ef4444", "#f97316"] }}
+        wheelRotation={wheelRotation}
+        wheelSpinning={wheelSpinning}
+        winBurstActive={winBurstActive}
+        buttonLabel="SPIN"
+        buttonBusyLabel="..."
+        buttonTitle={
+          rewardSettings && oldestBankedSpinDate
+            ? "Spin oldest catch-up token"
+            : "No catch-up spins available yet."
+        }
+        disabled={saving || wheelSpinning || !rewardSettings || !oldestBankedSpinDate}
+        onClick={spinBankedToken}
+        legend={
+          <>
+            <span className="goal-wheel-legend-win">Win zone: {chancePercent.toFixed(1)}%</span>
+            <span className="goal-wheel-legend-miss">
+              Miss zone: {(100 - chancePercent).toFixed(1)}%
+            </span>
+            <span className="goal-wheel-legend-miss">Segments: {wheelSegmentCount}</span>
             <button
-              className="goal-wheel-center"
+              className="btn secondary"
               type="button"
-              disabled={saving || wheelSpinning || !rewardSettings || !oldestBankedSpinDate}
-              onClick={spinBankedToken}
+              onClick={() => setWheelSoundOn((value) => !value)}
             >
-              {wheelSpinning ? "..." : "SPIN"}
+              Sound: {wheelSoundOn ? "On" : "Off"}
             </button>
-          </div>
-          {winBurstActive && (
-            <>
-              <span className="goal-confetti goal-confetti-1" />
-              <span className="goal-confetti goal-confetti-2" />
-              <span className="goal-confetti goal-confetti-3" />
-              <span className="goal-confetti goal-confetti-4" />
-              <span className="goal-confetti goal-confetti-5" />
-              <span className="goal-confetti goal-confetti-6" />
-            </>
-          )}
-        </div>
-        <div className="goal-wheel-legend">
-          <span className="goal-wheel-legend-win">Win zone: {chancePercent.toFixed(1)}%</span>
-          <span className="goal-wheel-legend-miss">
-            Miss zone: {(100 - chancePercent).toFixed(1)}%
-          </span>
-          <span className="goal-wheel-legend-miss">Segments: {wheelSegmentCount}</span>
-          <button
-            className="btn secondary"
-            type="button"
-            onClick={() => setWheelSoundOn((value) => !value)}
-          >
-            Sound: {wheelSoundOn ? "On" : "Off"}
-          </button>
-        </div>
-        <div className="item-sub">
-          {oldestBankedSpinDate
-            ? `Next token to spin: ${DateTime.fromISO(oldestBankedSpinDate).toFormat("cccc, LLL d")}`
-            : "No banked spin tokens right now."}
-        </div>
-      </div>
+          </>
+        }
+        footer={
+          oldestBankedSpinDate
+            ? `Next catch-up spin: ${DateTime.fromISO(oldestBankedSpinDate).toFormat("cccc, LLL d")}`
+            : "No catch-up spins right now."
+        }
+      />
 
       <div className="card stack">
         <div style={{ fontWeight: 700 }}>History</div>
