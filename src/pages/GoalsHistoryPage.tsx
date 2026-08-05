@@ -440,6 +440,10 @@ export default function GoalsHistoryPage({ userId }: Props) {
     const rewardWins = attemptRows.filter(
       (attempt) => scopedDates.includes(attempt.local_date) && attempt.did_win,
     ).length;
+    const rewardSpins = attemptRows.filter((attempt) =>
+      scopedDates.includes(attempt.local_date),
+    ).length;
+    const rewardWinRate = rewardSpins > 0 ? (rewardWins / rewardSpins) * 100 : 0;
 
     return {
       avgCompletion,
@@ -450,6 +454,8 @@ export default function GoalsHistoryPage({ userId }: Props) {
       mostCommonSuccess,
       mostCommonFailure,
       rewardWins,
+      rewardSpins,
+      rewardWinRate,
     };
   }, [displayDates, summaryByDate, rowsByDate, templates, attemptRows]);
 
@@ -617,9 +623,9 @@ export default function GoalsHistoryPage({ userId }: Props) {
           <div className="goal-pill">Current streak: {topStats.streakNow}</div>
           <div className="goal-pill">Avg completion: {topStats.avgCompletion.toFixed(1)}%</div>
           <div className="goal-pill">
-            Required pass rate: {topStats.requiredPassRate.toFixed(1)}%
+            Luck: {topStats.rewardWinRate.toFixed(1)}% ({topStats.rewardWins}/{topStats.rewardSpins}
+            )
           </div>
-          <div className="goal-pill">Reward wins: {topStats.rewardWins}</div>
         </div>
         <div className="item-sub">
           Most common success:{" "}
@@ -708,13 +714,6 @@ export default function GoalsHistoryPage({ userId }: Props) {
             : "No catch-up spins right now."
         }
       />
-
-      <div className="card stack">
-        <div style={{ fontWeight: 700 }}>History</div>
-        <div className="item-sub">
-          Green check means all active daily goals were completed for that day.
-        </div>
-      </div>
 
       {loading && <div className="card">Loading history...</div>}
 
