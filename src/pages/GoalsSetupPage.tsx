@@ -15,6 +15,10 @@ interface Props {
   userId: string;
 }
 
+type ConfiguredGoalTemplate = GoalTemplate & {
+  items: Array<{ id: string; label: string; default_checked: boolean }>;
+};
+
 interface WheelSector {
   startDeg: number;
   endDeg: number;
@@ -109,9 +113,7 @@ function pickLandingAngle(sectors: WheelSector[], didWin: boolean) {
 }
 
 export default function GoalsSetupPage({ userId }: Props) {
-  const [templates, setTemplates] = useState<
-    Array<GoalTemplate & { items: Array<{ id: string; label: string; default_checked: boolean }> }>
-  >([]);
+  const [templates, setTemplates] = useState<ConfiguredGoalTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -423,7 +425,7 @@ export default function GoalsSetupPage({ userId }: Props) {
     }
   }
 
-  function beginEdit(template: GoalTemplate) {
+  function beginEdit(template: ConfiguredGoalTemplate) {
     setEditingTemplateId(template.id);
     setEditTitle(template.title);
     setEditTargetValue(String(template.target_value ?? 1));
@@ -437,7 +439,7 @@ export default function GoalsSetupPage({ userId }: Props) {
     setEditingTemplateId(null);
   }
 
-  async function saveGoalEdits(template: GoalTemplate) {
+  async function saveGoalEdits(template: ConfiguredGoalTemplate) {
     const cleanTitle = editTitle.trim();
     if (!cleanTitle) {
       setError("Goal title is required.");
@@ -462,12 +464,52 @@ export default function GoalsSetupPage({ userId }: Props) {
     }
     patch.required_for_reward = editRequiredForReward;
 
+    const nextTargetValue =
+      template.goal_kind === "number" ? (patch.target_value ?? template.target_value) : null;
+    const nextDefaultChecked =
+      template.goal_kind === "checkbox"
+        ? (patch.default_checked ?? template.default_checked)
+        : template.default_checked;
+    const nextRequiredForReward = patch.required_for_reward ?? template.required_for_reward;
+
+    const completionRulesChanged =
+      nextTargetValue !== template.target_value ||
+      nextDefaultChecked !== template.default_checked ||
+      nextRequiredForReward !== template.required_for_reward;
+    const shouldVersionTemplate = completionRulesChanged;
+
     setSaving(true);
     setError(null);
     setSuccess(null);
     try {
-      await updateGoalTemplate(template.id, patch);
-      setSuccess("Goal updated.");
+      if (shouldVersionTemplate) {
+        const created = await createGoalTemplate({
+          user_id: userId,
+          title: cleanTitle,
+          goal_kind: template.goal_kind,
+          target_value: template.goal_kind === "number" ? nextTargetValue : null,
+          default_checked: template.goal_kind === "checkbox" ? nextDefaultChecked : false,
+          required_for_reward: nextRequiredForReward,
+          display_order: template.display_order,
+        });
+
+        if (template.goal_kind === "checkbox" && template.items.length > 0) {
+          await replaceGoalTemplateItems(
+            created.id,
+            template.items.map((item) => ({
+              label: item.label,
+              default_checked: item.default_checked,
+            })),
+          );
+        }
+
+        await updateGoalTemplate(template.id, { active: false });
+        setSuccess("Goal updated. Future days use the new version; history keeps the old one.");
+      } else {
+        await updateGoalTemplate(template.id, patch);
+        setSuccess("Goal updated.");
+      }
+
       setEditingTemplateId(null);
       await load();
     } catch (e: any) {

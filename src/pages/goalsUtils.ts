@@ -41,12 +41,38 @@ function wasCreatedOnOrBeforeLocalDate(createdAt: string, localDate: string) {
   return createdLocalDate == null || createdLocalDate <= localDate;
 }
 
+function wasUpdatedAfterCreation(createdAt: string, updatedAt: string) {
+  const createdAtTime = DateTime.fromISO(createdAt);
+  const updatedAtTime = DateTime.fromISO(updatedAt);
+  if (!createdAtTime.isValid || !updatedAtTime.isValid) return false;
+  return updatedAtTime.toMillis() > createdAtTime.toMillis();
+}
+
+function wasTemplateActiveOnLocalDate(template: GoalTemplateWithItems, localDate: string) {
+  if (!wasCreatedOnOrBeforeLocalDate(template.created_at, localDate)) {
+    return false;
+  }
+
+  if (template.active) {
+    return true;
+  }
+
+  if (!wasUpdatedAfterCreation(template.created_at, template.updated_at)) {
+    return false;
+  }
+
+  const updatedLocalDate = DateTime.fromISO(template.updated_at).toLocal().toISODate();
+  if (updatedLocalDate == null) {
+    return false;
+  }
+
+  // Inactive templates still count for dates before they were archived/edited.
+  return localDate < updatedLocalDate;
+}
+
 export function getActiveTemplatesForDate(templates: GoalTemplateWithItems[], localDate: string) {
   return templates
-    .filter(
-      (template) =>
-        template.active && wasCreatedOnOrBeforeLocalDate(template.created_at, localDate),
-    )
+    .filter((template) => wasTemplateActiveOnLocalDate(template, localDate))
     .map((template) => ({
       ...template,
       items: template.items.filter((item) =>
